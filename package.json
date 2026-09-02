@@ -1,18 +1,33 @@
 {
-  "name": "i7seven-billing",
-  "version": "1.0.0",
-  "private": true,
-  "description": "I7SEVEN MOBILE billing system",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "node --env-file=.env.local server.js"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    }
+  ],
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "{node_modules/pdfkit/js/**,public/logo.png}"
+    }
   },
-  "dependencies": {
-    "nodemailer": "^7.0.3",
-    "pdfkit": "^0.20.2",
-    "pg": "^8.13.1"
-  },
-  "engines": {
-    "node": ">=22"
-  }
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "same-origin"
+        }
+      ]
+    }
+  ]
 }

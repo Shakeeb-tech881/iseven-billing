@@ -106,6 +106,13 @@
   </main>
 </div>
 
+<!-- Thumb-reach actions. Hidden above 920px, where the top bar is used. -->
+<div class="m-bar">
+  <button class="btn ghost narrow" id="m-preview">Preview</button>
+  <button class="btn ghost narrow" id="m-print">Print</button>
+  <button class="btn" id="m-save">Save invoice</button>
+</div>
+
 <script src="core.js"></script>
 <script>
 (function () {
@@ -295,6 +302,16 @@
   });
 
   $("btn-print").addEventListener("click", () => window.print());
+  $("m-print").addEventListener("click", () => window.print());
+
+  /* The mobile buttons drive the same handlers as the top bar. */
+  $("m-save").addEventListener("click", () => $("btn-save").click());
+
+  $("m-preview").addEventListener("click", () => {
+    const showing = document.body.classList.toggle("show-preview");
+    $("m-preview").textContent = showing ? "Edit" : "Preview";
+    window.scrollTo({ top: 0 });
+  });
 
   $("btn-pdf").addEventListener("click", () => {
     if (savedId) window.open("/api/invoices/" + savedId + "/pdf", "_blank");
@@ -341,6 +358,7 @@
     };
 
     $("btn-save").disabled = true;
+    $("m-save").disabled = true;
     try {
       const out = editId
         ? await I7.api("/api/invoices/" + editId, { method: "PUT", body: JSON.stringify(payload) })
@@ -350,6 +368,8 @@
       $("saved-no").textContent = out.number;
       $("saved").classList.add("show");
       $("btn-save").textContent = editId ? "Changes saved" : "Saved";
+      $("m-save").textContent = $("btn-save").textContent;
+      $("m-save").disabled = true;
       $("btn-pdf").style.display = "inline-block";
       showMail(out.email);
       renderPaper();
@@ -357,6 +377,7 @@
     } catch (err) {
       showErr(err.message);
       $("btn-save").disabled = false;
+      $("m-save").disabled = false;
     }
   });
 

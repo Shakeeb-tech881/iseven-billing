@@ -426,3 +426,13 @@ td.acts{white-space:nowrap}
 }
 .mini:hover{color:var(--ink);background:var(--lime);border-color:var(--lime)}
 .mini.del:hover{background:var(--danger);border-color:var(--danger);color:#fff}
+
+
+/* ---- number fields: no spinner arrows ----
+   The up/down arrows are useless for prices and warranty days, and on a
+   touch screen they are easy to hit by accident. */
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button{
+  -webkit-appearance:none;appearance:none;margin:0;
+}

@@ -264,6 +264,21 @@
   document.addEventListener("input", onEdit);
   document.addEventListener("change", onEdit);
 
+  /* Selecting the contents on focus means typing replaces the 0 instead
+     of producing 0440000. */
+  document.addEventListener("focusin", (e) => {
+    if (e.target.matches && e.target.matches("input.num")) e.target.select();
+  });
+
+  /* A field left empty falls back to 0 rather than staying blank. */
+  document.addEventListener("focusout", (e) => {
+    const el = e.target;
+    if (el.matches && el.matches("input.num") && el.value === "") {
+      el.value = 0;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  });
+
   document.addEventListener("click", (e) => {
     const k = e.target.closest("[data-kill]");
     if (!k) return;

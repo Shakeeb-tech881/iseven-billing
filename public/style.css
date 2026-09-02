@@ -436,3 +436,83 @@ input[type=number]::-webkit-outer-spin-button,
 input[type=number]::-webkit-inner-spin-button{
   -webkit-appearance:none;appearance:none;margin:0;
 }
+
+/* ==========================================================
+   MOBILE
+   The till screen is two columns on a desktop: form on the
+   left, live preview on the right. Stacking those on a phone
+   buries the preview under a long scroll, so below 920px the
+   preview is hidden behind a toggle and the actions move to a
+   fixed bar within thumb reach.
+   ========================================================== */
+@media (max-width: 920px){
+
+  /* iOS zooms the page when a focused input is under 16px. */
+  input, textarea, select{
+    font-size:16px;
+    min-height:44px;
+    padding:10px 12px;
+  }
+  textarea{min-height:80px}
+  .field label{font-size:10px;margin-bottom:5px}
+  .row2, .row3{grid-template-columns:1fr;gap:10px}
+
+  .topbar{padding:10px 14px}
+  .topbar .brand img{height:17px}
+  .navlinks{padding-left:10px}
+  .navlinks a{padding:8px 10px}
+  /* the desktop buttons are replaced by the bar at the bottom */
+  .shell ~ .m-bar, .m-bar{display:flex}
+  .topbar .bar-actions{display:none}
+
+  .entry{padding:18px 14px 96px}
+  .item{padding:12px}
+  .item-head{margin-bottom:8px}
+  .kill{font-size:24px;padding:6px 10px;margin:-6px -6px 0 0}
+  .add-item{padding:15px;font-size:12.5px}
+  .group{margin-bottom:28px}
+
+  /* preview hidden until asked for */
+  .stage{display:none}
+  body.show-preview .entry{display:none}
+  body.show-preview .stage{display:flex;padding:14px 10px 96px}
+
+  /* fixed action bar */
+  .m-bar{
+    position:fixed;left:0;right:0;bottom:0;z-index:40;
+    background:var(--ink);border-top:1px solid var(--ink-3);
+    padding:10px 12px;gap:9px;
+    padding-bottom:calc(10px + env(safe-area-inset-bottom));
+  }
+  .m-bar .btn{flex:1;padding:14px 10px;font-size:12.5px}
+  .m-bar .btn.narrow{flex:0 0 auto;padding:14px 16px}
+
+  /* dashboard */
+  .dash{padding:14px 12px 30px}
+  .stats{grid-template-columns:1fr 1fr;gap:8px}
+  .stat{padding:12px}
+  .stat .v{font-size:18px}
+  .searchbar{padding:12px}
+  .searchbar input.big{font-size:16px;padding:12px}
+  .chip{padding:9px 13px;font-size:11px}
+  table.rt th{padding:8px 10px}
+  table.rt td{padding:13px 10px;font-size:13px}
+  .mini{padding:8px 11px;font-size:10.5px;margin:2px 0 2px 5px}
+  td.acts{white-space:normal}
+  .viewer{padding:12px 8px 40px}
+  .viewer .vbar{flex-wrap:wrap;gap:8px}
+  .viewer .vbar .btn{flex:1;padding:11px 8px}
+
+  /* the paper itself */
+  .paper{box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  .head-band{padding:16px 16px}
+  .pbody{padding:18px 16px 24px}
+  .inv-meta{gap:18px;padding:13px 0}
+  table.lines td{font-size:12.5px;padding:9px 0}
+  table.lines td.r{padding-left:8px}
+  .sums table{min-width:0;width:100%}
+}
+
+/* Never show the mobile bar on a desktop, and never in print. */
+.m-bar{display:none}
+@media print{ .m-bar{display:none !important} }

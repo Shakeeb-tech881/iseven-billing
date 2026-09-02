@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard — I7SEVEN MOBILE</title>
+<link rel="icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+
+<div class="topbar">
+  <div class="brand">
+    <img src="logo.png" alt="I7SEVEN">
+    <nav class="navlinks">
+      <a href="/">New invoice</a>
+      <a href="dashboard.html" class="on">Dashboard</a>
+    </nav>
+  </div>
+  <div class="bar-actions">
+    <span class="role-tag" id="role-tag" style="display:none"></span>
+    <button class="btn ghost" id="btn-logout">Sign out</button>
+    <button class="btn" onclick="location.href='/'">+ New invoice</button>
+  </div>
+</div>
+
+<div class="dash">
+  <div class="stats" id="stats"></div>
+
+  <div class="searchbar">
+    <div class="srow">
+      <div class="field" style="margin:0">
+        <label>Search</label>
+        <input class="big code" id="q" placeholder="Type an NIC, IMEI, invoice number, name or phone…" autofocus>
+      </div>
+      <div class="field" style="margin:0">
+        <label>Search in</label>
+        <select id="field">
+          <option value="all">Everything</option>
+          <option value="nic">NIC number</option>
+          <option value="imei">IMEI / serial</option>
+          <option value="number">Invoice number</option>
+          <option value="name">Customer name</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0"><label>From</label><input type="date" id="from"></div>
+      <div class="field" style="margin:0"><label>To</label><input type="date" id="to"></div>
+      <button class="btn ghost" id="btn-reset">Reset</button>
+    </div>
+    <div class="chips">
+      <button class="chip on" data-preset="">All time</button>
+      <button class="chip" data-preset="today">Today</button>
+      <button class="chip" data-preset="week">Last 7 days</button>
+      <button class="chip" data-preset="month">This month</button>
+    </div>
+  </div>
+
+  <div class="results">
+    <div class="rhead">
+      <span id="rcount">Loading\u2026</span>
+      <span id="rsum"></span>
+    </div>
+    <table class="rt">
+      <thead>
+        <tr>
+          <th>Invoice</th>
+          <th>Customer</th>
+          <th>NIC</th>
+          <th>IMEI / serial</th>
+          <th>Email</th>
+          <th class="r">Date</th>
+          <th class="r">Total</th>
+          <th class="r">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="nores" id="nores" style="display:none">No invoices match that search.</div>
+  </div>
+</div>
+
+<!-- full invoice viewer -->
+<div class="viewer" id="viewer">
+  <div class="vwrap">
+    <div class="vbar">
+      <span class="t" id="vtitle"></span>
+      <span style="display:flex;gap:8px">
+        <button class="btn ghost sm" id="v-close">Close</button>
+        <button class="btn ghost sm" id="v-edit">Edit</button>
+        <button class="btn ghost sm" id="v-email">Send email</button>
+        <button class="btn ghost sm" id="v-pdf">Download PDF</button>
+        <button class="btn sm" id="v-print">Print</button>
+      </span>
+    </div>
+    <div class="paper" id="vpaper"></div>
+  </div>
+</div>
+
+<script src="core.js"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  let timer = null;
+
+  /* ---------------- stats ---------------- */
+  async function loadStats() {
+    try {
+      const s = await I7.api("/api/stats");
+      const c = s.currency || "LKR";
+      $("stats").innerHTML = `
+        <div class="stat hero">
+          <div class="k">Sales this month</div>
+          <div class="v">${c} ${I7.money(s.month_total_c)}</div>
+        </div>
+        <div class="stat">
+          <div class="k">Invoices this month</div>
+          <div class="v">${s.month_count} <small>/ ${s.today_count} today</small></div>
+        </div>
+        <div class="stat">
+          <div class="k">VAT this month</div>
+          <div class="v">${c} ${I7.money(s.month_vat_c)}</div>
+        </div>
+        <div class="stat">
+          <div class="k">SSCL this month</div>
+          <div class="v">${c} ${I7.money(s.month_sscl_c)}</div>
+        </div>
+        <div class="stat">
+          <div class="k">Warranties in force</div>
+          <div class="v">${s.active_warranties} <small>items</small></div>
+        </div>
+        <div class="stat">
+          <div class="k">Invoices on record</div>
+          <div class="v">${s.all_count}</div>
+        </div>`;
+    } catch (e) {
+      $("stats").innerHTML = `<div class="stat"><div class="k">Stats</div><div class="v"><small>${I7.esc(e.message)}</small></div></div>`;
+    }
+  }
+
+  /* ---------------- search ---------------- */
+  async function search() {
+    const p = new URLSearchParams({
+      q: $("q").value.trim(),
+      field: $("field").value
+    });
+    if ($("from").value) p.set("from", $("from").value);
+    if ($("to").value)   p.set("to", $("to").value);
+
+    try {
+      const rows = await I7.api("/api/invoices?" + p.toString());
+      const total = rows.reduce((a, r) => a + r.total_c, 0);
+      $("rcount").textContent = rows.length
+        ? `${rows.length} invoice${rows.length === 1 ? "" : "s"}`
+        : "No results";
+      $("rsum").textContent = rows.length ? `Total ${rows[0].currency || "LKR"} ${I7.money(total)}` : "";
+      $("nores").style.display = rows.length ? "none" : "block";
+
+      $("rows").innerHTML = rows.map((r) => {
+        const modeTag = { none: "No VAT", vat: "VAT", vat_sscl: "VAT+SSCL", incl: "VAT incl." }[r.tax_mode] || "";
+        return `<tr data-id="${r.id}">
+          <td class="num">${I7.esc(r.number)}<span class="sub">${r.item_count} item${r.item_count === 1 ? "" : "s"}</span></td>
+          <td>${I7.esc(r.cust_name)}${r.cust_phone ? `<span class="sub">${I7.esc(r.cust_phone)}</span>` : ""}</td>
+          <td class="mono">${r.cust_nic ? I7.esc(r.cust_nic) : "<span style='opacity:.35'>\u2014</span>"}</td>
+          <td class="mono" style="font-size:11px">${r.imeis ? I7.esc(r.imeis) : "<span style='opacity:.35'>\u2014</span>"}</td>
+          <td style="font-size:11px">${r.cust_email ? I7.esc(r.cust_email) : "<span style='opacity:.35'>\u2014</span>"}${epill(r.email_status)}</td>
+          <td class="r mono">${I7.niceDate(r.issue_date)}<span class="sub"><span class="tag">${modeTag}</span></span></td>
+          ${document.body.dataset.role === "cashier" ? "" : `<td class="r mono" style="font-weight:700">${I7.money(r.total_c)}</td>`}
+          ${document.body.dataset.role === "cashier" ? "" : `<td class="r acts">
+             <button class="mini" data-edit="${r.id}">Edit</button>
+             <button class="mini del" data-del="${r.id}" data-no="${I7.esc(r.number)}">Delete</button>
+           </td>`}
+        </tr>`;
+      }).join("");
+    } catch (e) {
+      $("rcount").textContent = e.message;
+      $("rows").innerHTML = "";
+    }
+  }
+
+  function debounced() { clearTimeout(timer); timer = setTimeout(search, 180); }
+
+  ["q"].forEach((id) => $(id).addEventListener("input", debounced));
+  ["field", "from", "to"].forEach((id) => $(id).addEventListener("change", search));
+
+  $("btn-reset").addEventListener("click", () => {
+    $("q").value = ""; $("field").value = "all"; $("from").value = ""; $("to").value = "";
+    document.querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.preset === ""));
+    search(); $("q").focus();
+  });
+
+  document.querySelectorAll(".chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll(".chip").forEach((c) => c.classList.remove("on"));
+      chip.classList.add("on");
+      const t = I7.isoToday();
+      const p = chip.dataset.preset;
+      if (p === "today")      { $("from").value = t; $("to").value = t; }
+      else if (p === "week")  { $("from").value = I7.addDays(t, -6); $("to").value = t; }
+      else if (p === "month") { $("from").value = t.slice(0, 7) + "-01"; $("to").value = t; }
+      else                    { $("from").value = ""; $("to").value = ""; }
+      search();
+    });
+  });
+
+  /* ---------------- viewer ---------------- */
+  async function openInvoice(id) {
+    try {
+      const inv = await I7.api("/api/invoices/" + id);
+      inv.totals = {
+        subtotal_c: inv.subtotal_c, discount_c: inv.discount_c, net_c: inv.net_c,
+        sscl_c: inv.sscl_c, taxable_c: inv.taxable_c, vat_c: inv.vat_c,
+        incl_vat_c: inv.incl_vat_c, total_c: inv.total_c
+      };
+      $("vpaper").innerHTML = I7.renderPaper(inv);
+      viewingId = inv.id;
+      $("v-email").style.display = inv.cust_email ? "inline-block" : "none";
+      $("v-email").disabled = false;
+      $("v-email").textContent = "Send email";
+      $("vtitle").textContent = inv.number + " \u00b7 " + inv.cust_name;
+      $("viewer").classList.add("show");
+      document.body.style.overflow = "hidden";
+    } catch (e) { alert(e.message); }
+  }
+
+  function closeViewer() {
+    $("viewer").classList.remove("show");
+    document.body.style.overflow = "";
+  }
+
+  let viewingId = null;
+
+  $("rows").addEventListener("click", async (e) => {
+    const ed = e.target.closest("[data-edit]");
+    if (ed) { location.href = "/?edit=" + ed.dataset.edit; return; }
+
+    const del = e.target.closest("[data-del]");
+    if (del) {
+      const no = del.dataset.no;
+      if (!confirm(`Delete invoice ${no}?\n\nThis removes it and its items permanently. The number ${no} will not be reused, so your sequence will show a gap.`)) return;
+      try {
+        await I7.api("/api/invoices/" + del.dataset.del, { method: "DELETE" });
+        loadStats(); search();
+      } catch (err) { alert(err.message); }
+      return;
+    }
+
+    const tr = e.target.closest("tr[data-id]");
+    if (tr) openInvoice(tr.dataset.id);
+  });
+
+  $("v-edit").addEventListener("click", () => {
+    if (viewingId) location.href = "/?edit=" + viewingId;
+  });
+
+  $("v-pdf").addEventListener("click", () => {
+    if (viewingId) window.open("/api/invoices/" + viewingId + "/pdf", "_blank");
+  });
+
+  $("v-email").addEventListener("click", async () => {
+    if (!viewingId) return;
+    const btn = $("v-email");
+    btn.disabled = true; btn.textContent = "Sending\u2026";
+    try {
+      const r = await I7.api("/api/invoices/" + viewingId + "/email", { method: "POST" });
+      btn.textContent = r.sent ? "Sent to " + r.to : "Failed";
+      if (!r.sent) alert(r.error || "The email did not send.");
+      search();
+    } catch (e) {
+      btn.textContent = "Failed"; alert(e.message);
+    }
+    setTimeout(() => { btn.disabled = false; btn.textContent = "Send email"; }, 2500);
+  });
+  $("v-close").addEventListener("click", closeViewer);
+  $("v-print").addEventListener("click", () => window.print());
+  $("viewer").addEventListener("click", (e) => { if (e.target === $("viewer")) closeViewer(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && $("viewer").classList.contains("show")) closeViewer();
+    if (e.key === "/" && document.activeElement !== $("q")) { e.preventDefault(); $("q").focus(); }
+  });
+
+  function epill(st) {
+    if (!st || st === "not_sent") return "";
+    const map = { sent: ["sent", "Sent"], failed: ["failed", "Failed"],
+                  bad_address: ["failed", "Bad address"], no_address: ["", "No address"],
+                  disabled: ["", "Sending off"] };
+    const m = map[st] || ["", st];
+    return `<span class="epill ${m[0]}">${m[1]}</span>`;
+  }
+
+  $("btn-logout").addEventListener("click", async () => {
+    await fetch("/api/logout").catch(() => {});
+    location.href = "/login.html";
+  });
+
+  (async function boot() {
+    let sess = { role: "admin", required: false };
+    try { sess = await fetch("/api/session").then((r) => r.json()); } catch {}
+
+    if (sess.required && !sess.authed) {
+      location.href = "/login.html?next=" + encodeURIComponent(location.pathname);
+      return;
+    }
+
+    const tag = $("role-tag");
+    if (sess.required) {
+      tag.style.display = "inline-block";
+      tag.textContent = sess.role;
+      tag.classList.toggle("cashier", sess.role === "cashier");
+    }
+
+    /* Cashiers may look up warranties but see no money figures. */
+    if (sess.role === "cashier") {
+      $("stats").remove();
+      $("rsum").remove();
+      document.querySelectorAll("table.rt th").forEach((th) => {
+        if (th.textContent.trim() === "Total") th.remove();
+      });
+      document.body.dataset.role = "cashier";
+      $("v-edit").style.display = "none";
+    } else {
+      loadStats();
+    }
+    search();
+  })();
+})();
+</script>

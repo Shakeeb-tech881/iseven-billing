@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New invoice — I7SEVEN MOBILE</title>
+<link rel="icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+
+<div class="topbar">
+  <div class="brand">
+    <img src="logo.png" alt="I7SEVEN">
+    <nav class="navlinks">
+      <a href="/" class="on">New invoice</a>
+      <a href="dashboard.html">Dashboard</a>
+    </nav>
+  </div>
+  <div class="bar-actions">
+    <button class="btn ghost" id="btn-clear">Clear</button>
+    <button class="btn ghost" id="btn-pdf" style="display:none">PDF</button>
+    <button class="btn ghost" id="btn-print">Print</button>
+    <button class="btn" id="btn-save">Save invoice</button>
+  </div>
+</div>
+
+<div class="shell">
+  <aside class="entry">
+    <div class="err" id="err"></div>
+    <div class="edit-note" id="edit-note">
+      Editing <b id="edit-no"></b> — the invoice number will not change.
+      Use <b>Send email</b> afterwards if the customer needs the corrected copy.
+    </div>
+    <div class="saved-flag" id="saved">Saved as <span class="n" id="saved-no"></span></div>
+    <div class="mail-flag" id="mailflag">
+      <span id="mailmsg"></span>
+      <button class="btn sm" id="btn-send" style="display:none">Send email</button>
+    </div>
+
+    <div class="group">
+      <h2>Customer</h2>
+      <div class="field"><label>Name <b style="color:var(--lime)">*</b></label><input id="cust_name" placeholder="Full name"></div>
+      <div class="field"><label>NIC number</label><input class="code" id="cust_nic" placeholder="200012345678 or 901234567V"></div>
+      <div class="field"><label>Phone</label><input class="code" id="cust_phone" placeholder="+94 77 000 0000"></div>
+      <div class="field"><label>Email <span id="mail-on" style="color:var(--lime)">· invoice sent here automatically</span></label><input type="email" id="cust_email" placeholder="customer@example.com"></div>
+      <div class="field"><label>Address</label><textarea rows="2" id="cust_address"></textarea></div>
+      <p class="hint">NIC is how you look this customer up later. It is stored and printed on the invoice. Nothing is emailed until you press <b>Send email</b> after saving.</p>
+    </div>
+
+    <div class="group">
+      <h2>Invoice</h2>
+      <div class="row2">
+        <div class="field"><label>Issue date</label><input type="date" id="issue_date"></div>
+        <div class="field"><label>Due date <span style="color:var(--on-dark-soft);text-transform:none;letter-spacing:0">(credit sales only)</span></label><input type="date" id="due_date"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Currency</label><input id="currency"></div>
+        <div class="field"><label>Served by</label><input id="cashier" placeholder="Cashier name"></div>
+      </div>
+      <p class="hint">The invoice number is issued by the system when you save, in unbroken sequence. Leave the due date blank for a normal counter sale — it is only printed when the customer owes money later.</p>
+    </div>
+
+    <div class="group">
+      <h2>Items</h2>
+      <div id="item-list"></div>
+      <button class="add-item" id="btn-add">+ Add item</button>
+      <p class="hint">Type warranty in <b>days</b> for each item. Use 0 for accessories sold without warranty. IMEI is searchable from the dashboard.</p>
+    </div>
+
+    <div class="group">
+      <h2>Tax</h2>
+      <div class="field">
+        <label>Tax treatment</label>
+        <select id="tax_mode">
+          <option value="none">No VAT</option>
+          <option value="vat">VAT 18%</option>
+          <option value="vat_sscl">VAT + SSCL</option>
+          <option value="incl">Price includes VAT 18%</option>
+        </select>
+      </div>
+      <div id="vat-fields">
+        <div class="row2">
+          <div class="field"><label>VAT %</label><input class="num" type="number" min="0" step="0.01" id="vat_rate"></div>
+          <div class="field" id="sscl-field"><label>SSCL %</label><input class="num" type="number" min="0" step="0.01" id="sscl_rate"></div>
+        </div>
+        <div class="field"><label>VAT registration no.</label><input class="code" id="vat_no" placeholder="Shown at the top of the invoice"></div>
+      </div>
+      <div class="field"><label>Discount</label><input class="num" type="number" min="0" step="0.01" id="discount" value="0"></div>
+      <div class="taxnote" id="tax-note"></div>
+    </div>
+
+    <div class="group">
+      <h2>Warranty conditions</h2>
+      <div class="field"><textarea rows="4" id="warranty_text"></textarea></div>
+    </div>
+
+    <div class="group">
+      <h2>Terms and conditions</h2>
+      <div class="field"><textarea rows="5" id="terms"></textarea></div>
+    </div>
+  </aside>
+
+  <main class="stage">
+    <div class="paper" id="paper"></div>
+  </main>
+</div>
+
+<script src="core.js"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  let settings = {};
+  const blankItem = () => ({ description: "", imei: "", warranty_type: "shop",
+                             warranty_days: 0, qty: 1, unit_price: 0 });
+  let items = [blankItem()];
+  const editId = new URLSearchParams(location.search).get("edit");
+  let savedNumber = null;
+  let savedId = null;
+  let mailOn = false;
+
+  /* Three states: ready to send, sent, or failed. */
+  function showMail(r) {
+    const box = $("mailflag"), msg = $("mailmsg"), btn = $("btn-send");
+    if (!r || r.reason === "no_address") { box.classList.remove("show"); return; }
+
+    box.classList.add("show");
+
+    if (r.reason === "not_sent") {
+      box.classList.remove("bad");
+      msg.textContent = mailOn
+        ? "Ready to email " + ($("cust_email").value.trim() || "the customer")
+        : "Email sending is switched off on this server.";
+      btn.style.display = (mailOn && savedId) ? "inline-block" : "none";
+      btn.textContent = "Send email";
+      btn.disabled = false;
+      return;
+    }
+
+    if (r.sent) {
+      box.classList.remove("bad");
+      msg.textContent = "Invoice emailed to " + r.to;
+      btn.style.display = "none";
+    } else {
+      box.classList.add("bad");
+      msg.textContent = "The email did not send. " + (r.error || "");
+      btn.style.display = savedId ? "inline-block" : "none";
+      btn.textContent = "Try again";
+      btn.disabled = false;
+    }
+  }
+
+  /* ---------- read the form into a document object ---------- */
+  function collect() {
+    const mode = $("tax_mode").value;
+    const norm = items.map((it) => {
+      const qty = Number(it.qty) || 0;
+      const unit_price_c = I7.cents(it.unit_price);
+      return {
+        description: it.description,
+        imei: it.imei,
+        warranty_type: it.warranty_type || "shop",
+        warranty_days: Math.max(0, parseInt(it.warranty_days, 10) || 0),
+        qty, unit_price_c,
+        amount_c: Math.round(qty * unit_price_c)
+      };
+    });
+
+    const doc = {
+      number: savedNumber || "\u2014 not saved \u2014",
+      issue_date: $("issue_date").value,
+      due_date: $("due_date").value,
+      currency: $("currency").value,
+      biz_name: settings.biz_name,
+      biz_lines: settings.biz_lines,
+      biz_address: settings.biz_address,
+      biz_phone: settings.biz_phone,
+      biz_email: settings.biz_email,
+      vat_no: $("vat_no").value,
+      tax_mode: mode,
+      vat_rate: mode === "none" ? 0 : Number($("vat_rate").value) || 0,
+      sscl_rate: mode === "vat_sscl" ? Number($("sscl_rate").value) || 0 : 0,
+      cust_name: $("cust_name").value,
+      cust_nic: $("cust_nic").value.toUpperCase(),
+      cust_phone: $("cust_phone").value,
+      cust_address: $("cust_address").value,
+      cust_email: $("cust_email").value.trim().toLowerCase(),
+      cashier: $("cashier").value,
+      discount_c: I7.cents($("discount").value),
+      warranty_text: $("warranty_text").value,
+      terms: $("terms").value,
+      items: norm.filter((it) => it.description.trim() || it.qty || it.unit_price_c)
+    };
+    doc.totals = I7.computeTotals(doc);
+    return doc;
+  }
+
+  /* ---------- render ---------- */
+  function renderItems() {
+    $("item-list").innerHTML = items.map((it, i) => {
+      const lt = Math.round((Number(it.qty) || 0) * I7.cents(it.unit_price));
+      return `<div class="item">
+        <div class="item-head">
+          <span class="item-no">${I7.pad(i + 1, 2)}</span>
+          <button class="kill" data-kill="${i}" aria-label="Remove item ${i + 1}">&times;</button>
+        </div>
+        <div class="field"><input data-f="description" data-i="${i}" placeholder="Item name" value="${I7.esc(it.description)}"></div>
+        <div class="field"><label>IMEI / serial</label><input class="code" data-f="imei" data-i="${i}" placeholder="Optional \u2014 searchable" value="${I7.esc(it.imei)}"></div>
+        <div class="row2">
+          <div class="field"><label>Qty</label><input class="num" type="number" min="0" step="1" data-f="qty" data-i="${i}" value="${I7.esc(it.qty)}"></div>
+          <div class="field"><label>Unit price</label><input class="num" type="number" min="0" step="0.01" data-f="unit_price" data-i="${i}" value="${I7.esc(it.unit_price)}"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Warranty type</label>
+            <select data-f="warranty_type" data-i="${i}">
+              <option value="shop"${it.warranty_type === "shop" ? " selected" : ""}>Normal warranty</option>
+              <option value="apple_care"${it.warranty_type === "apple_care" ? " selected" : ""}>AppleCare</option>
+              <option value="company"${it.warranty_type === "company" ? " selected" : ""}>Company warranty</option>
+            </select>
+          </div>
+          <div class="field"><label>Warranty days</label><input class="num" type="number" min="0" step="1" data-f="warranty_days" data-i="${i}" value="${I7.esc(it.warranty_days)}"></div>
+        </div>
+        <div class="line-total">${I7.esc($("currency").value)} ${I7.money(lt)}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderTaxUI() {
+    const mode = $("tax_mode").value;
+    $("vat-fields").style.display = mode === "none" ? "none" : "block";
+    $("sscl-field").style.display = mode === "vat_sscl" ? "block" : "none";
+    $("tax-note").innerHTML = I7.TAX_NOTES[mode];
+  }
+
+  function renderPaper() { $("paper").innerHTML = I7.renderPaper(collect()); }
+  function render() { renderItems(); renderTaxUI(); renderPaper(); }
+
+  /* ---------- events ---------- */
+  function onEdit(e) {
+    const el = e.target;
+    if (el.dataset && el.dataset.f !== undefined) {
+      const i = Number(el.dataset.i), f = el.dataset.f;
+      items[i][f] = (f === "description" || f === "imei" || f === "warranty_type")
+                   ? el.value : (el.value === "" ? 0 : Number(el.value));
+      if (f === "warranty_type") { renderPaper(); return; }
+      const box = el.closest(".item");
+      if (box) {
+        const lt = Math.round((Number(items[i].qty) || 0) * I7.cents(items[i].unit_price));
+        box.querySelector(".line-total").textContent = $("currency").value + " " + I7.money(lt);
+      }
+      renderPaper();
+      return;
+    }
+    if (el.id === "tax_mode") renderTaxUI();
+    if (el.id === "currency") renderItems();
+    if (el.id === "issue_date") {
+      const pd = Number(settings.payment_days);
+      $("due_date").value = pd > 0 ? I7.addDays(el.value, pd) : "";
+    }
+    renderPaper();
+  }
+  document.addEventListener("input", onEdit);
+  document.addEventListener("change", onEdit);
+
+  document.addEventListener("click", (e) => {
+    const k = e.target.closest("[data-kill]");
+    if (!k) return;
+    items.splice(Number(k.dataset.kill), 1);
+    if (!items.length) items.push(blankItem());
+    render();
+  });
+
+  $("btn-add").addEventListener("click", () => {
+    items.push(blankItem());
+    renderItems();
+    const boxes = $("item-list").querySelectorAll('input[data-f="description"]');
+    if (boxes.length) boxes[boxes.length - 1].focus();
+  });
+
+  $("btn-print").addEventListener("click", () => window.print());
+
+  $("btn-pdf").addEventListener("click", () => {
+    if (savedId) window.open("/api/invoices/" + savedId + "/pdf", "_blank");
+  });
+
+  $("btn-send").addEventListener("click", async () => {
+    if (!savedId) return;
+    const btn = $("btn-send");
+    btn.disabled = true;
+    btn.textContent = "Sending\u2026";
+    try {
+      showMail(await I7.api("/api/invoices/" + savedId + "/email", { method: "POST" }));
+    } catch (e) {
+      showMail({ sent: false, error: e.message });
+    }
+  });
+
+  function showErr(msg) {
+    const e = $("err");
+    if (!msg) { e.classList.remove("show"); return; }
+    e.textContent = msg; e.classList.add("show");
+    e.scrollIntoView({ block: "nearest" });
+  }
+
+  $("btn-save").addEventListener("click", async () => {
+    showErr("");
+    const d = collect();
+    if (!d.cust_name.trim()) return showErr("Enter the customer name before saving.");
+    if (!d.items.length)     return showErr("Add at least one item before saving.");
+
+    const payload = {
+      issue_date: d.issue_date, due_date: d.due_date, currency: d.currency,
+      cust_name: d.cust_name, cust_nic: d.cust_nic,
+      cust_phone: d.cust_phone, cust_address: d.cust_address,
+      cust_email: d.cust_email,
+      tax_mode: d.tax_mode, vat_rate: d.vat_rate, sscl_rate: d.sscl_rate, vat_no: d.vat_no,
+      discount: Number($("discount").value) || 0,
+      warranty_text: d.warranty_text, terms: d.terms, cashier: d.cashier,
+      items: items.map((it) => ({
+        description: it.description, imei: it.imei,
+        warranty_type: it.warranty_type || "shop",
+        warranty_days: it.warranty_days, qty: it.qty, unit_price: it.unit_price
+      }))
+    };
+
+    $("btn-save").disabled = true;
+    try {
+      const out = editId
+        ? await I7.api("/api/invoices/" + editId, { method: "PUT", body: JSON.stringify(payload) })
+        : await I7.api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
+      savedNumber = out.number;
+      savedId = out.id;
+      $("saved-no").textContent = out.number;
+      $("saved").classList.add("show");
+      $("btn-save").textContent = editId ? "Changes saved" : "Saved";
+      $("btn-pdf").style.display = "inline-block";
+      showMail(out.email);
+      renderPaper();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {
+      showErr(err.message);
+      $("btn-save").disabled = false;
+    }
+  });
+
+  $("btn-clear").addEventListener("click", () => {
+    if (savedNumber && !confirm("Start a new blank invoice?")) return;
+    location.reload();
+  });
+
+  /* ---------- boot ---------- */
+  (async function init() {
+    try { settings = await I7.api("/api/settings"); }
+    catch { settings = {}; }
+
+    try {
+      const sess = await fetch("/api/session").then((r) => r.json());
+      mailOn = Boolean(sess.mail);
+      if (sess.role === "cashier") document.querySelector('a[href="dashboard.html"]').style.display = "none";
+    } catch { /* stay usable offline */ }
+    $("mail-on").textContent = mailOn ? "\u00b7 send after saving" : "\u00b7 sending is off";
+
+    const today = I7.isoToday();
+    $("issue_date").value = today;
+    const payDays = settings.payment_days === undefined ? 14 : Number(settings.payment_days);
+    $("due_date").value = payDays > 0 ? I7.addDays(today, payDays) : "";
+    $("currency").value = settings.currency || "LKR";
+    $("vat_rate").value = settings.vat_rate || 18;
+    $("sscl_rate").value = settings.sscl_rate || 2.5;
+    $("vat_no").value = settings.vat_no || "";
+    $("tax_mode").value = settings.tax_mode || "vat";
+    $("warranty_text").value = settings.warranty_text || "";
+    $("terms").value = settings.terms || "";
+    if (editId) {
+      try {
+        const inv = await I7.api("/api/invoices/" + editId);
+        savedNumber = inv.number; savedId = inv.id;
+        $("btn-pdf").style.display = "inline-block";
+        $("cust_name").value = inv.cust_name || "";
+        $("cust_nic").value = inv.cust_nic || "";
+        $("cust_phone").value = inv.cust_phone || "";
+        $("cust_email").value = inv.cust_email || "";
+        $("cust_address").value = inv.cust_address || "";
+        $("issue_date").value = inv.issue_date || today;
+        $("due_date").value = inv.due_date || "";
+        $("currency").value = inv.currency || "LKR";
+        $("cashier").value = inv.cashier || "";
+        $("tax_mode").value = inv.tax_mode || "none";
+        $("vat_rate").value = inv.vat_rate || 0;
+        $("sscl_rate").value = inv.sscl_rate || 0;
+        $("vat_no").value = inv.vat_no || "";
+        $("discount").value = (inv.discount_c || 0) / 100;
+        $("warranty_text").value = inv.warranty_text || "";
+        $("terms").value = inv.terms || "";
+        items = (inv.items || []).map((it) => ({
+          description: it.description, imei: it.imei || "",
+          warranty_type: it.warranty_type || "shop",
+          warranty_days: it.warranty_days || 0,
+          qty: it.qty, unit_price: (it.unit_price_c || 0) / 100
+        }));
+        if (!items.length) items.push(blankItem());
+        document.querySelector(".topbar h1, .navlinks a.on").textContent = "Editing " + inv.number;
+        $("btn-save").textContent = "Save changes";
+        $("edit-note").classList.add("show");
+        $("edit-no").textContent = inv.number;
+      } catch (e) { showErr("Could not load that invoice: " + e.message); }
+    }
+
+    render();
+    $("cust_name").focus();
+  })();
+})();
+</script>

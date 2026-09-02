@@ -1,12 +1,8 @@
-# Vercel must run the serverless function in api/, not the local server.
-# Leaving server.js in the deployment makes Vercel start it as a legacy
-# long-running server, which ignores the functions config in vercel.json.
-server.js
-server-supabase.js
+# Vercel runs server.js as the entrypoint, so it must stay in the deployment.
+# Only local-only files are excluded here.
 data/
 *.md
 .env
 .env.local
 .env.example
 .env.local.example
-schema.sql

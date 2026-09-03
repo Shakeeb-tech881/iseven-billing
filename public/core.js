@@ -10,10 +10,11 @@
 
   /* Warranty types. "shop" stays the default for accessories and repairs. */
   const WARRANTY_TYPES = {
-    shop:       { label: "Warranty",           short: "Shop" },
-    apple_care: { label: "AppleCare warranty", short: "AppleCare" },
-    company:    { label: "Company warranty",   short: "Company" }
+    shop:       { label: "Limited Warranty",           short: "Limited" },
+    apple_care: { label: "AppleCare Limited warranty", short: "AppleCare" },
+    company:    { label: "Company warranty",           short: "Company" }
   };
+
   const warrantyLabel = (t) => (WARRANTY_TYPES[t] || WARRANTY_TYPES.shop).label;
   const warrantyShort = (t) => (WARRANTY_TYPES[t] || WARRANTY_TYPES.shop).short;
 
@@ -101,6 +102,22 @@
   const showDue = (d) => Boolean(d.due_date) && d.due_date !== d.issue_date;
 
   const telHref = (phone) => "tel:" + String(phone || "").replace(/[^\d+]/g, "");
+
+  /* Warranty terms are stored one point per line. A leading label
+     before the first colon is emphasised, so "Scope & Eligibility: ..."
+     reads as a heading and body rather than a wall of text. */
+  function termList(text) {
+    const lines = String(text || "").split("\n").map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) return "";
+    if (lines.length === 1) return `<p>${esc(lines[0])}</p>`;
+    return `<ul class="tlist">${lines.map((line) => {
+      const i = line.indexOf(":");
+      if (i > 0 && i < 48) {
+        return `<li><b>${esc(line.slice(0, i + 1))}</b> ${esc(line.slice(i + 1).trim())}</li>`;
+      }
+      return `<li>${esc(line)}</li>`;
+    }).join("")}</ul>`;
+  }
 
   /* Address as plain text; phone and email tappable. */
   function contactBlock(d) {
@@ -209,13 +226,13 @@
           }).join("")}
         </table>` : "";
       warranty = `<div class="warranty">
-          <div class="wh">Warranty</div>
-          <div class="wb">${wt}<p>${esc(d.warranty_text || "")}</p></div>
+          <div class="wh">Warranty terms &amp; conditions</div>
+          <div class="wb">${wt}${termList(d.warranty_text)}</div>
         </div>`;
     }
 
     const terms = (d.terms || "").trim()
-      ? `<div class="terms"><h3>Terms and conditions</h3><p>${esc(d.terms)}</p></div>` : "";
+      ? `<div class="terms"><h3>Terms and conditions</h3>${termList(d.terms)}</div>` : "";
 
     const footer = `<div class="footline">
         <div>Thank you for your business.</div>

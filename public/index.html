@@ -120,7 +120,11 @@
   const $ = (id) => document.getElementById(id);
 
   let settings = {};
-  const blankItem = () => ({ description: "", imei: "", warranty_type: "shop",
+  /* Overwritten from settings once they load, so a new item starts on
+     whichever warranty the shop sells most. */
+  let defaultWarrantyType = "apple_care";
+  const blankItem = () => ({ description: "", imei: "",
+                             warranty_type: defaultWarrantyType,
                              warranty_days: 0, qty: 1, unit_price: 0 });
   let items = [blankItem()];
   const editId = new URLSearchParams(location.search).get("edit");
@@ -225,9 +229,10 @@
               <option value="shop"${it.warranty_type === "shop" ? " selected" : ""}>Limited Warranty</option>
               <option value="apple_care"${it.warranty_type === "apple_care" ? " selected" : ""}>AppleCare Limited</option>
               <option value="company"${it.warranty_type === "company" ? " selected" : ""}>Company warranty</option>
+              <option value="none"${it.warranty_type === "none" ? " selected" : ""}>No Warranty</option>
             </select>
           </div>
-          <div class="field"><label>Warranty days</label><input class="num" type="number" min="0" step="1" data-f="warranty_days" data-i="${i}" value="${I7.esc(it.warranty_days)}"></div>
+          <div class="field"><label>Warranty days</label><input class="num" type="number" min="0" step="1" data-f="warranty_days" data-i="${i}" value="${I7.esc(it.warranty_days)}"${it.warranty_type === "none" ? " disabled" : ""}></div>
         </div>
         <div class="line-total">${I7.esc($("currency").value)} ${I7.money(lt)}</div>
       </div>`;
@@ -251,7 +256,13 @@
       const i = Number(el.dataset.i), f = el.dataset.f;
       items[i][f] = (f === "description" || f === "imei" || f === "warranty_type")
                    ? el.value : (el.value === "" ? 0 : Number(el.value));
-      if (f === "warranty_type") { renderPaper(); return; }
+      if (f === "warranty_type") {
+        /* "No Warranty" carries no days, so clear the box and lock it. */
+        if (el.value === "none") items[i].warranty_days = 0;
+        renderItems();
+        renderPaper();
+        return;
+      }
       const box = el.closest(".item");
       if (box) {
         const lt = Math.round((Number(items[i].qty) || 0) * I7.cents(items[i].unit_price));
@@ -406,7 +417,14 @@
     $("vat_rate").value = settings.vat_rate || 18;
     $("sscl_rate").value = settings.sscl_rate || 2.5;
     $("vat_no").value = settings.vat_no || "";
-    $("tax_mode").value = settings.tax_mode || "vat";
+    $("tax_mode").value = settings.tax_mode || "none";
+    defaultWarrantyType = settings.warranty_type_default || "apple_care";
+    /* the first row was built before settings arrived */
+    items.forEach((it) => {
+      if (!it.description && !it.imei && !it.warranty_days && !it.unit_price) {
+        it.warranty_type = defaultWarrantyType;
+      }
+    });
     $("warranty_text").value = settings.warranty_text || "";
     $("terms").value = settings.terms || "";
     if (editId) {

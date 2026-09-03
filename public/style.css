@@ -516,3 +516,25 @@ input[type=number]::-webkit-inner-spin-button{
 /* Never show the mobile bar on a desktop, and never in print. */
 .m-bar{display:none}
 @media print{ .m-bar{display:none !important} }
+
+/* ---- warranty / terms bullet list ---- */
+.warranty .tlist, .terms .tlist{
+  margin:0;padding:0 0 0 15px;list-style:none;
+}
+.warranty .tlist li, .terms .tlist li{
+  position:relative;font-size:11.5px;color:var(--text-soft);
+  line-height:1.55;margin-bottom:5px;
+}
+.terms .tlist li{font-size:11px}
+.warranty .tlist li:last-child, .terms .tlist li:last-child{margin-bottom:0}
+.warranty .tlist li::before, .terms .tlist li::before{
+  content:"";position:absolute;left:-11px;top:6px;
+  width:4px;height:4px;border-radius:50%;background:var(--rule);
+}
+.warranty .tlist b, .terms .tlist b{color:var(--text);font-weight:700}
+
+/* ---- claim deadline note in the warranty table ---- */
+.warranty .hand{
+  display:block;margin-top:2px;font-size:9.5px;font-weight:700;
+  letter-spacing:.04em;color:var(--stamp,#a8352a);
+}

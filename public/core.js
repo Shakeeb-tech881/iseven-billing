@@ -12,7 +12,8 @@
   const WARRANTY_TYPES = {
     shop:       { label: "Limited Warranty",           short: "Limited" },
     apple_care: { label: "AppleCare Limited warranty", short: "AppleCare" },
-    company:    { label: "Company warranty",           short: "Company" }
+    company:    { label: "Company warranty",           short: "Company" },
+    none:       { label: "No Warranty",                short: "None", noCover: true }
   };
 
   const warrantyLabel = (t) => (WARRANTY_TYPES[t] || WARRANTY_TYPES.shop).label;
@@ -178,8 +179,12 @@
         const until = it.warranty_until || (days ? addDays(d.issue_date, days) : null);
         const imei = (it.imei || "").trim()
           ? `<span class="imei-line">IMEI <b>${esc(it.imei)}</b></span>` : "";
-        const w = days > 0
-          ? `<span class="wtag ${esc(it.warranty_type || "shop")}">${esc(warrantyLabel(it.warranty_type))} <b>${days}</b> days \u00b7 valid to ${niceDate(until)}</span>` : "";
+        const noCover = it.warranty_type === "none";
+        const w = noCover
+          ? `<span class="wtag none">${esc(warrantyLabel("none"))}</span>`
+          : days > 0
+            ? `<span class="wtag ${esc(it.warranty_type || "shop")}">${esc(warrantyLabel(it.warranty_type))} <b>${days}</b> days \u00b7 valid to ${niceDate(until)}</span>`
+            : "";
         return `<tr>
           <td class="idx">${pad(i + 1, 2)}</td>
           <td class="desc">${esc(it.description || "\u2014")}${imei}${w ? "<br>" + w : ""}</td>

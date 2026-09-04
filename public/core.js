@@ -111,12 +111,17 @@
     const lines = String(text || "").split("\n").map((l) => l.trim()).filter(Boolean);
     if (!lines.length) return "";
     if (lines.length === 1) return `<p>${esc(lines[0])}</p>`;
-    return `<ul class="tlist">${lines.map((line) => {
+    return `<ul class="tlist">${lines.map((raw) => {
+      /* A line starting with ! is highlighted, for points the customer
+         must not miss. The marker itself is never printed. */
+      const hot = raw.startsWith("!");
+      const line = hot ? raw.slice(1).trim() : raw;
+      const cls = hot ? ' class="hot"' : "";
       const i = line.indexOf(":");
       if (i > 0 && i < 48) {
-        return `<li><b>${esc(line.slice(0, i + 1))}</b> ${esc(line.slice(i + 1).trim())}</li>`;
+        return `<li${cls}><b>${esc(line.slice(0, i + 1))}</b> ${esc(line.slice(i + 1).trim())}</li>`;
       }
-      return `<li>${esc(line)}</li>`;
+      return `<li${cls}>${esc(line)}</li>`;
     }).join("")}</ul>`;
   }
 
@@ -141,6 +146,7 @@
     const cur = d.currency || "";
     const mode = d.tax_mode || "none";
     const t = d.totals || computeTotals(d);
+    const showExpiry = d.show_warranty_expiry !== false && d.show_warranty_expiry !== 0;
     const items = (d.items || []);
 
     /* --- head band: VAT number only appears when a tax type is selected --- */
@@ -179,12 +185,10 @@
         const until = it.warranty_until || (days ? addDays(d.issue_date, days) : null);
         const imei = (it.imei || "").trim()
           ? `<span class="imei-line">IMEI <b>${esc(it.imei)}</b></span>` : "";
-        const noCover = it.warranty_type === "none";
-        const w = noCover
-          ? `<span class="wtag none">${esc(warrantyLabel("none"))}</span>`
-          : days > 0
-            ? `<span class="wtag ${esc(it.warranty_type || "shop")}">${esc(warrantyLabel(it.warranty_type))} <b>${days}</b> days \u00b7 valid to ${niceDate(until)}</span>`
-            : "";
+        /* "No Warranty" prints nothing at all. */
+        const w = (days > 0 && it.warranty_type !== "none")
+          ? `<span class="wtag ${esc(it.warranty_type || "shop")}">${esc(warrantyLabel(it.warranty_type))} <b>${days}</b> days${showExpiry ? ` \u00b7 valid to ${niceDate(until)}` : ""}</span>`
+          : "";
         return `<tr>
           <td class="idx">${pad(i + 1, 2)}</td>
           <td class="desc">${esc(it.description || "\u2014")}${imei}${w ? "<br>" + w : ""}</td>
@@ -219,22 +223,14 @@
       : "";
 
     /* --- warranty panel --- */
-    const wItems = items.filter((it) => (Number(it.warranty_days) || 0) > 0);
-    let warranty = "";
-    if (wItems.length || (d.warranty_text || "").trim()) {
-      const wt = wItems.length ? `<table>
-          <tr><th>Item</th><th>Type</th><th class="r">Days</th><th class="r">Covered until</th></tr>
-          ${wItems.map((it) => {
-            const until = it.warranty_until || addDays(d.issue_date, it.warranty_days);
-            const label = esc(it.description) + ((it.imei || "").trim() ? ` \u00b7 ${esc(it.imei)}` : "");
-            return `<tr><td>${label}</td><td class="wtype">${esc(warrantyShort(it.warranty_type))}</td><td class="r">${Number(it.warranty_days)}</td><td class="r">${niceDate(until)}</td></tr>`;
-          }).join("")}
-        </table>` : "";
-      warranty = `<div class="warranty">
-          <div class="wh">Warranty terms &amp; conditions</div>
-          <div class="wb">${wt}${termList(d.warranty_text)}</div>
-        </div>`;
-    }
+    /* The item lines already carry type, days and expiry, so the warranty
+       box holds the terms only and does not repeat them. */
+    const warranty = (d.warranty_text || "").trim()
+      ? `<div class="warranty">
+           <div class="wh">Warranty terms &amp; conditions</div>
+           <div class="wb">${termList(d.warranty_text)}</div>
+         </div>`
+      : "";
 
     const terms = (d.terms || "").trim()
       ? `<div class="terms"><h3>Terms and conditions</h3>${termList(d.terms)}</div>` : "";

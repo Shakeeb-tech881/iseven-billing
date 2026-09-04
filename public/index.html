@@ -65,7 +65,11 @@
       <h2>Items</h2>
       <div id="item-list"></div>
       <button class="add-item" id="btn-add">+ Add item</button>
-      <p class="hint">Type warranty in <b>days</b> for each item. Use 0 for accessories sold without warranty. IMEI is searchable from the dashboard.</p>
+      <label class="cbx-row">
+        <input type="checkbox" id="show_warranty_expiry" checked>
+        <span>Print the warranty expiry date <b>(valid to …)</b> on this invoice</span>
+      </label>
+      <p class="hint">Type warranty in <b>days</b> for each item. Untick above to print only the number of days. Choosing <b>No Warranty</b> leaves the line blank. IMEI is searchable from the dashboard.</p>
     </div>
 
     <div class="group">
@@ -199,6 +203,7 @@
       cust_address: $("cust_address").value,
       cust_email: $("cust_email").value.trim().toLowerCase(),
       cashier: $("cashier").value,
+      show_warranty_expiry: $("show_warranty_expiry").checked,
       discount_c: I7.cents($("discount").value),
       warranty_text: $("warranty_text").value,
       terms: $("terms").value,
@@ -361,6 +366,7 @@
       tax_mode: d.tax_mode, vat_rate: d.vat_rate, sscl_rate: d.sscl_rate, vat_no: d.vat_no,
       discount: Number($("discount").value) || 0,
       warranty_text: d.warranty_text, terms: d.terms, cashier: d.cashier,
+      show_warranty_expiry: d.show_warranty_expiry,
       items: items.map((it) => ({
         description: it.description, imei: it.imei,
         warranty_type: it.warranty_type || "shop",
@@ -448,6 +454,8 @@
         $("discount").value = (inv.discount_c || 0) / 100;
         $("warranty_text").value = inv.warranty_text || "";
         $("terms").value = inv.terms || "";
+        $("show_warranty_expiry").checked =
+          inv.show_warranty_expiry !== false && inv.show_warranty_expiry !== 0;
         items = (inv.items || []).map((it) => ({
           description: it.description, imei: it.imei || "",
           warranty_type: it.warranty_type || "shop",

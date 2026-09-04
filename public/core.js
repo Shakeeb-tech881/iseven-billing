@@ -146,7 +146,11 @@
     const cur = d.currency || "";
     const mode = d.tax_mode || "none";
     const t = d.totals || computeTotals(d);
-    const showExpiry = d.show_warranty_expiry !== false && d.show_warranty_expiry !== 0;
+    const lineShowsExpiry = (it) => {
+      if (it.show_expiry === false || it.show_expiry === 0) return false;
+      if (it.show_expiry === true  || it.show_expiry === 1) return true;
+      return d.show_warranty_expiry !== false && d.show_warranty_expiry !== 0;
+    };
     const items = (d.items || []);
 
     /* --- head band: VAT number only appears when a tax type is selected --- */
@@ -187,7 +191,7 @@
           ? `<span class="imei-line">IMEI <b>${esc(it.imei)}</b></span>` : "";
         /* "No Warranty" prints nothing at all. */
         const w = (days > 0 && it.warranty_type !== "none")
-          ? `<span class="wtag ${esc(it.warranty_type || "shop")}">${esc(warrantyLabel(it.warranty_type))} <b>${days}</b> days${showExpiry ? ` \u00b7 valid to ${niceDate(until)}` : ""}</span>`
+          ? `<span class="wtag ${esc(it.warranty_type || "shop")}">${esc(warrantyLabel(it.warranty_type))} <b>${days}</b> days${lineShowsExpiry(it) ? ` \u00b7 valid to ${niceDate(until)}` : ""}</span>`
           : "";
         return `<tr>
           <td class="idx">${pad(i + 1, 2)}</td>

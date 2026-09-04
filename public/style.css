@@ -557,3 +557,4 @@ input[type=number]::-webkit-inner-spin-button{
 .warranty .tlist li.hot::before, .terms .tlist li.hot::before{
   background:#8aa800;left:-6px;top:12px;
 }
+.cbx-row.tight{margin:8px 0 0;font-size:11.5px;color:var(--on-dark-soft)}

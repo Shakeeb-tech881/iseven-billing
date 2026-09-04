@@ -1,394 +1,296 @@
-/* =========================================================
-   I7SEVEN MOBILE — invoice email
+/* ==========================================================
+   I7SEVEN MOBILE — shared client library
+   Tax engine, formatting, and the printed-document renderer.
+   Used by both the new-invoice page and the dashboard.
+   ========================================================== */
+(function (global) {
+  "use strict";
 
-   Sends the invoice as a formatted HTML email. No PDF library,
-   no headless browser, so it runs anywhere including Vercel.
+  const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-   Environment variables:
-     SMTP_HOST   e.g. smtp-relay.brevo.com
-     SMTP_PORT   587
-     SMTP_USER   your Brevo SMTP login
-     SMTP_PASS   your Brevo SMTP key
-     MAIL_FROM   I7SEVEN MOBILE <info@iseven.lk>
-     MAIL_REPLY_TO   optional, defaults to MAIL_FROM
-
-   With SMTP_HOST unset, sending is switched off and invoices
-   simply save without an email. Nothing breaks.
-   ========================================================= */
-"use strict";
-
-const path = require("node:path");
-const fs = require("node:fs");
-
-const mailEnabled = () => Boolean(process.env.SMTP_HOST && process.env.SMTP_USER);
-
-const FROM = () => process.env.MAIL_FROM || "I7SEVEN MOBILE <info@iseven.lk>";
-
-/* One transport per warm instance. */
-function getTransport() {
-  if (!globalThis.__i7mail) {
-    const nodemailer = require("nodemailer");
-    const port = Number(process.env.SMTP_PORT || 587);
-    globalThis.__i7mail = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port,
-      secure: port === 465,          // 587 uses STARTTLS, not implicit TLS
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-      connectionTimeout: 12000,
-      greetingTimeout: 8000,
-      socketTimeout: 20000
-    });
-  }
-  return globalThis.__i7mail;
-}
-
-/* ---------------------------------------------------------
-   Formatting
---------------------------------------------------------- */
-const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
-const WTYPE = {
-  shop:       { label: "Limited Warranty",           short: "Limited" },
-  apple_care: { label: "AppleCare Limited warranty", short: "AppleCare" },
-  company:    { label: "Company warranty",           short: "Company" },
-  none:       { label: "No Warranty",                short: "None", noCover: true }
-};
-
-const wLabel = (t) => (WTYPE[t] || WTYPE.shop).label;
-
-/* Each line decides whether to print its expiry date. Invoices created
-   before per-item control fall back to the invoice-wide setting.
-   Module scope, because both the HTML and plain-text builders use it. */
-function lineShowsExpiry(inv, it) {
-  if (it.show_expiry === false || it.show_expiry === 0) return false;
-  if (it.show_expiry === true  || it.show_expiry === 1) return true;
-  return inv.show_warranty_expiry !== false && inv.show_warranty_expiry !== 0;
-}
-const wShort = (t) => (WTYPE[t] || WTYPE.shop).short;
-
-function money(c) {
-  const neg = c < 0; c = Math.abs(Math.round(c || 0));
-  const s = (c / 100).toFixed(2).split(".");
-  s[0] = s[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return (neg ? "-" : "") + s[0] + "." + s[1];
-}
-
-const esc = (s) => String(s == null ? "" : s)
-  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-  .replace(/"/g, "&quot;");
-
-function niceDate(v) {
-  if (!v) return "\u2014";
-  const p = String(v).split("-");
-  if (p.length !== 3) return String(v);
-  return `${p[2]} ${MON[Number(p[1]) - 1]} ${p[0]}`;
-}
-
-/* Basic sanity check. Real validation is the delivery attempt itself. */
-const looksLikeEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(e || "").trim());
-
-/* ---------------------------------------------------------
-   HTML body
-
-   Email clients strip <style> blocks and ignore flexbox, so
-   everything here is tables with inline styles. That is not
-   old-fashioned, it is the only thing that renders reliably
-   in Gmail, Outlook and Apple Mail.
---------------------------------------------------------- */
-/* One point per line, with the label before the first colon in bold. */
-function termListHtml(text, size) {
-  const lines = String(text || "").split("\n").map((l) => l.trim()).filter(Boolean);
-  if (!lines.length) return "";
-  const fs2 = size || 11.5;
-  if (lines.length === 1) {
-    return `<p style="margin:0;font-size:${fs2}px;color:#5f6b7d;line-height:1.55">${esc(lines[0])}</p>`;
-  }
-  return `<table cellpadding="0" cellspacing="0" width="100%">${lines.map((raw) => {
-    /* A line starting with ! is highlighted. The marker is not printed. */
-    const hot = raw.startsWith("!");
-    const line = hot ? raw.slice(1).trim() : raw;
-    const i = line.indexOf(":");
-    const body = (i > 0 && i < 48)
-      ? `<b style="color:#141b25">${esc(line.slice(0, i + 1))}</b> ${esc(line.slice(i + 1).trim())}`
-      : esc(line);
-    if (hot) {
-      /* Lime band: label as a heading, sentence beneath. */
-      const head = (i > 0 && i < 60) ? esc(line.slice(0, i).trim()) : "";
-      const rest = (i > 0 && i < 60) ? esc(line.slice(i + 1).trim()) : esc(line);
-      return `<tr><td colspan="2" style="padding:10px 0">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background:#e8fb9a;border-left:4px solid #10161f">
-          <tr><td style="padding:13px 15px;color:#10161f">
-            ${head ? `<div style="font-size:${fs2 + 3}px;font-weight:bold;line-height:1.3;margin-bottom:5px">${head}</div>` : ""}
-            <div style="font-size:${fs2 + 1}px;line-height:1.5">${rest}</div>
-          </td></tr>
-        </table>
-      </td></tr>`;
-    }
-    return `<tr>
-      <td valign="top" width="12" style="font-size:${fs2}px;color:#ccd3de;padding:0 0 5px">&bull;</td>
-      <td valign="top" style="font-size:${fs2}px;line-height:1.55;color:#5f6b7d;padding:0 0 5px">${body}</td>
-    </tr>`;
-  }).join("")}</table>`;
-}
-
-function renderEmail(inv, attachmentName) {
-  const cur = inv.currency || "LKR";
-  const mode = inv.tax_mode || "none";
-  const items = inv.items || [];
-  /* Only show Due when the customer actually owes money later. */
-  const showDue = Boolean(inv.due_date) && inv.due_date !== inv.issue_date;
-
-  const telHref = (p2) => "tel:" + String(p2 || "").replace(/[^\d+]/g, "");
-  const A = "color:#5f6b7d;text-decoration:none";
-
-  const lines = items.map((it) => {
-    const imei = (it.imei || "").trim()
-      ? `<div style="font-family:Consolas,monospace;font-size:11px;color:#5f6b7d;margin-top:2px">IMEI ${esc(it.imei)}</div>` : "";
-    const bar = it.warranty_type === "apple_care" ? "#111111"
-              : it.warranty_type === "company"    ? "#7a8699"
-              : it.warranty_type === "none"       ? "#b8bfcb" : "#c6fa02";
-    /* "No Warranty" prints nothing at all. */
-    const w = (Number(it.warranty_days) > 0 && it.warranty_type !== "none")
-      ? `<div style="font-size:11px;color:#5f6b7d;margin-top:4px;border-left:3px solid ${bar};padding-left:7px;line-height:1.45">${esc(wLabel(it.warranty_type))} <b style="color:#141b25">${Number(it.warranty_days)}</b> days${lineShowsExpiry(inv, it) ? ` &middot; valid to ${niceDate(it.warranty_until)}` : ""}</div>`
-      : "";
-    return `<tr>
-      <td style="padding:9px 0;border-bottom:1px solid #e7eaf1;font-size:13px;color:#141b25">
-        ${esc(it.description)}${imei}${w}
-      </td>
-      <td width="40"  style="padding:9px 0 9px 14px;border-bottom:1px solid #e7eaf1;font-size:13px;text-align:right;font-family:Consolas,monospace;color:#141b25;white-space:nowrap">${Number(it.qty) || 0}</td>
-      <td width="105" style="padding:9px 0 9px 14px;border-bottom:1px solid #e7eaf1;font-size:13px;text-align:right;font-family:Consolas,monospace;color:#141b25;white-space:nowrap">${money(it.unit_price_c)}</td>
-      <td width="105" style="padding:9px 0 9px 14px;border-bottom:1px solid #e7eaf1;font-size:13px;text-align:right;font-family:Consolas,monospace;color:#141b25;white-space:nowrap">${money(it.amount_c)}</td>
-    </tr>`;
-  }).join("");
-
-  const row = (label, value, opts = {}) => `<tr>
-    <td style="padding:4px 20px 4px 0;font-size:13px;color:${opts.strong ? "#141b25" : "#5f6b7d"};${opts.top ? "border-top:1px solid #ccd3de;padding-top:8px;" : ""}${opts.grand ? "border-top:2px solid #10161f;padding-top:10px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;font-size:11px;" : ""}">${label}</td>
-    <td style="padding:4px 0;font-size:${opts.grand ? "17px;font-weight:bold" : "13px"};text-align:right;font-family:Consolas,monospace;color:#141b25;${opts.top ? "border-top:1px solid #ccd3de;padding-top:8px;" : ""}${opts.grand ? "border-top:2px solid #10161f;padding-top:10px;" : ""}">${value}</td>
-  </tr>`;
-
-  let sums = row(mode === "incl" ? "Subtotal (VAT inclusive)" : "Subtotal", `${cur} ${money(inv.subtotal_c)}`);
-  if (inv.discount_c) sums += row("Discount", `-${cur} ${money(inv.discount_c)}`);
-  if (mode === "vat_sscl") {
-    if (inv.discount_c) sums += row("Value of goods", `${cur} ${money(inv.net_c)}`, { top: true });
-    sums += row(`SSCL ${Number(inv.sscl_rate) || 0}%`, `${cur} ${money(inv.sscl_c)}`);
-    sums += row("Value liable to VAT", `${cur} ${money(inv.taxable_c)}`, { top: true, strong: true });
-    sums += row(`VAT ${Number(inv.vat_rate) || 0}%`, `${cur} ${money(inv.vat_c)}`);
-  } else if (mode === "vat") {
-    sums += row(`VAT ${Number(inv.vat_rate) || 0}%`, `${cur} ${money(inv.vat_c)}`);
-  }
-  sums += row("Total due", `${cur} ${money(inv.total_c)}`, { grand: true });
-
-  const inclNote = mode === "incl"
-    ? `<div style="text-align:right;margin-top:6px;font-size:11px;color:#5f6b7d;font-family:Consolas,monospace">Includes VAT ${Number(inv.vat_rate) || 0}% of ${cur} ${money(inv.incl_vat_c)}</div>` : "";
-
-  /* The item lines already carry type, days and expiry, so the warranty
-     box holds the terms only and does not repeat them. */
-  const warranty = (inv.warranty_text || "").trim() ? `
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:26px;border:1px solid #10161f;border-collapse:collapse">
-      <tr><td style="background:#c6fa02;color:#10161f;padding:6px 13px;font-size:10px;font-weight:bold;letter-spacing:2px;text-transform:uppercase">Warranty terms &amp; conditions</td></tr>
-      <tr><td style="padding:13px">${termListHtml(inv.warranty_text, 11)}</td></tr>
-    </table>` : "";
-
-  const vatLine = (mode !== "none" && (inv.vat_no || "").trim())
-    ? `<div style="margin-top:7px;padding-top:6px;border-top:1px solid #2a3646;font-size:9px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:#8d99aa">VAT Reg. No.<br><span style="font-family:Consolas,monospace;font-size:12px;color:#e8edf4;letter-spacing:0">${esc(inv.vat_no)}</span></div>` : "";
-
-  const nic = (inv.cust_nic || "").trim()
-    ? `<div style="margin-top:5px;display:inline-block;font-family:Consolas,monospace;font-size:11px;background:#f2f5e3;border:1px solid #d9e5a0;padding:2px 8px;color:#141b25"><span style="font-family:Arial,sans-serif;font-weight:bold;font-size:8px;letter-spacing:1px;color:#5f6b7d">NIC</span> ${esc(inv.cust_nic)}</div>` : "";
-
-  return `<!doctype html>
-<html><body style="margin:0;padding:0;background:#e9ecf2;font-family:Arial,Helvetica,sans-serif">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#e9ecf2;padding:20px 10px">
-<tr><td align="center">
-<table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff">
-
-  <tr><td style="background:#10161f;padding:20px 32px">
-    <table width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td valign="top">
-        <img src="cid:i7logo" alt="I7SEVEN" width="150" style="display:block;border:0">
-        <div style="font-size:9px;font-weight:bold;letter-spacing:5px;text-transform:uppercase;color:#e8edf4;margin-top:6px;padding-left:2px">Mobile</div>
-      </td>
-      <td valign="top" align="right">
-        <div style="font-size:10px;font-weight:bold;letter-spacing:3px;text-transform:uppercase;color:#8d99aa">${mode === "none" ? "Invoice" : "Tax invoice"}</div>
-        <div style="font-family:Consolas,monospace;font-size:19px;font-weight:bold;color:#c6fa02;margin-top:2px">${esc(inv.number)}</div>
-        ${vatLine}
-      </td>
-    </tr></table>
-  </td></tr>
-  <tr><td style="background:#c6fa02;height:3px;line-height:3px;font-size:0">&nbsp;</td></tr>
-
-  <tr><td style="padding:24px 32px 32px">
-
-    ${(inv.biz_address || inv.biz_phone || inv.biz_email) ? `
-    <div style="font-size:12px;color:#5f6b7d;line-height:1.6">
-      ${inv.biz_address ? `${esc(inv.biz_address)}<br>` : ""}
-      ${inv.biz_phone ? `<a href="${esc(telHref(inv.biz_phone))}" style="${A}">${esc(inv.biz_phone)}</a>` : ""}
-      ${inv.biz_phone && inv.biz_email ? `<span style="color:#ccd3de">&nbsp;&middot;&nbsp;</span>` : ""}
-      ${inv.biz_email ? `<a href="mailto:${esc(inv.biz_email)}" style="${A}">${esc(inv.biz_email)}</a>` : ""}
-    </div>` : `
-    <div style="font-size:12px;color:#5f6b7d;line-height:1.5">${esc(inv.biz_lines || "").replace(/\n/g, "<br>")}</div>`}
-
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;border-top:2px solid #10161f;border-bottom:1px solid #ccd3de">
-      <tr>
-        <td valign="top" style="padding:13px 20px 13px 0">
-          <div style="font-size:9px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:#5f6b7d;margin-bottom:3px">Billed to</div>
-          <div style="font-size:13px;color:#141b25;line-height:1.5">${esc(inv.cust_name)}${inv.cust_address ? "<br>" + esc(inv.cust_address).replace(/\n/g, "<br>") : ""}${inv.cust_phone ? "<br>" + esc(inv.cust_phone) : ""}</div>
-          ${nic}
-        </td>
-        <td valign="top" style="padding:13px 20px 13px 0">
-          <div style="font-size:9px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:#5f6b7d;margin-bottom:3px">Issued</div>
-          <div style="font-size:13px;font-family:Consolas,monospace;color:#141b25">${niceDate(inv.issue_date)}</div>
-        </td>
-        ${showDue ? `<td valign="top" style="padding:13px 0">
-          <div style="font-size:9px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:#5f6b7d;margin-bottom:3px">Due</div>
-          <div style="font-size:13px;font-family:Consolas,monospace;color:#141b25">${niceDate(inv.due_date)}</div>
-        </td>` : ""}
-      </tr>
-    </table>
-
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;border-collapse:collapse">
-      <tr>
-        <td style="font-size:9px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:#5f6b7d;padding-bottom:6px;border-bottom:1px solid #10161f">Description</td>
-        <td width="40"  style="font-size:9px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:#5f6b7d;padding:0 0 6px 14px;border-bottom:1px solid #10161f;text-align:right">Qty</td>
-        <td width="105" style="font-size:9px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:#5f6b7d;padding:0 0 6px 14px;border-bottom:1px solid #10161f;text-align:right">Unit price</td>
-        <td width="105" style="font-size:9px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:#5f6b7d;padding:0 0 6px 14px;border-bottom:1px solid #10161f;text-align:right">Amount</td>
-      </tr>
-      ${lines}
-    </table>
-
-    <table cellpadding="0" cellspacing="0" align="right" style="margin-top:14px;min-width:290px">${sums}</table>
-    <div style="clear:both"></div>
-    ${inclNote}
-    ${warranty}
-
-    ${(inv.terms || "").trim() ? `<div style="margin-top:22px;padding-top:12px;border-top:1px solid #ccd3de">
-      <div style="font-size:9px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:#5f6b7d;margin-bottom:5px">Terms and conditions</div>
-      ${termListHtml(inv.terms, 11)}
-    </div>` : ""}
-
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:26px;background:#f4f6fa;border:1px solid #ccd3de">
-      <tr><td style="padding:13px 15px;font-size:12px;color:#141b25;line-height:1.55">
-        <b>Keep a copy.</b> Your invoice is attached as
-        <span style="font-family:Consolas,monospace">${esc(attachmentName || inv.number + ".pdf")}</span>.
-        Save it — you will need it to make a warranty claim.
-      </td></tr>
-    </table>
-
-    <div style="margin-top:22px;padding-top:12px;border-top:1px solid #e7eaf1;font-size:11px;color:#5f6b7d">
-      Thank you for your business. Questions about this invoice? Reply to this email.
-    </div>
-  </td></tr>
-</table>
-</td></tr></table>
-</body></html>`;
-}
-
-/* Plain-text fallback for clients that refuse HTML. */
-function renderText(inv) {
-  const cur = inv.currency || "LKR";
-  const L = [];
-  L.push(`${inv.biz_name || "I7SEVEN MOBILE"}`);
-  if (inv.biz_address) L.push(inv.biz_address);
-  if (inv.biz_phone || inv.biz_email)
-    L.push([inv.biz_phone, inv.biz_email].filter(Boolean).join("  \u00b7  "));
-  L.push(`${inv.tax_mode === "none" ? "Invoice" : "Tax invoice"} ${inv.number}`);
-  L.push(`Issued ${niceDate(inv.issue_date)}` +
-         (inv.due_date && inv.due_date !== inv.issue_date ? `   Due ${niceDate(inv.due_date)}` : ""));
-  L.push("");
-  L.push(`Billed to: ${inv.cust_name}${inv.cust_nic ? ` (NIC ${inv.cust_nic})` : ""}`);
-  L.push("");
-  for (const it of (inv.items || [])) {
-    L.push(`${it.description}  x${Number(it.qty) || 0}  ${cur} ${money(it.amount_c)}`);
-    if (it.imei) L.push(`   IMEI ${it.imei}`);
-    if (Number(it.warranty_days) > 0 && it.warranty_type !== "none") {
-      const exp = lineShowsExpiry(inv, it)
-        ? `, valid to ${niceDate(it.warranty_until)}` : "";
-      L.push(`   ${wLabel(it.warranty_type)} ${it.warranty_days} days${exp}`);
-    }
-  }
-  L.push("");
-  L.push(`Subtotal        ${cur} ${money(inv.subtotal_c)}`);
-  if (inv.discount_c) L.push(`Discount       -${cur} ${money(inv.discount_c)}`);
-  if (inv.tax_mode === "vat_sscl") {
-    L.push(`SSCL ${inv.sscl_rate}%      ${cur} ${money(inv.sscl_c)}`);
-    L.push(`Liable to VAT   ${cur} ${money(inv.taxable_c)}`);
-    L.push(`VAT ${inv.vat_rate}%        ${cur} ${money(inv.vat_c)}`);
-  } else if (inv.tax_mode === "vat") {
-    L.push(`VAT ${inv.vat_rate}%        ${cur} ${money(inv.vat_c)}`);
-  } else if (inv.tax_mode === "incl") {
-    L.push(`Includes VAT ${inv.vat_rate}% of ${cur} ${money(inv.incl_vat_c)}`);
-  }
-  L.push(`TOTAL DUE       ${cur} ${money(inv.total_c)}`);
-  L.push("");
-  L.push("Thank you for your business.");
-  return L.join("\n");
-}
-
-/* ---------------------------------------------------------
-   Send
---------------------------------------------------------- */
-/* A self-contained copy the customer can open and print to PDF.
-   No PDF library and no public URL needed, so it works anywhere. */
-function invoiceAttachment(inv) {
-  const html = renderEmail(inv, `${inv.number}.html`)
-    .replace('<img src="cid:i7logo" alt="I7SEVEN" width="150" style="display:block;border:0">',
-      '<div style="font-family:Arial,Helvetica,sans-serif;font-size:26px;font-weight:bold;font-style:italic;color:#c6fa02;letter-spacing:-1px">I7SEVEN</div>')
-    .replace("</body>",
-      `<div style="text-align:center;padding:14px;font-family:Arial,sans-serif;font-size:12px;color:#5f6b7d">
-         Use your browser's Print option, then choose "Save as PDF".
-       </div></body>`);
-  return {
-    filename: `${inv.number}.html`,
-    content: html,
-    contentType: "text/html; charset=utf-8"
+  /* Warranty types. "shop" stays the default for accessories and repairs. */
+  const WARRANTY_TYPES = {
+    shop:       { label: "Limited Warranty",           short: "Limited" },
+    apple_care: { label: "AppleCare Limited warranty", short: "AppleCare" },
+    company:    { label: "Company warranty",           short: "Company" },
+    none:       { label: "No Warranty",                short: "None", noCover: true }
   };
-}
 
-function logoAttachment() {
-  const p = path.join(__dirname, "..", "public", "logo.png");
-  try {
-    if (fs.existsSync(p)) {
-      return [{ filename: "logo.png", path: p, cid: "i7logo" }];
+  const warrantyLabel = (t) => (WARRANTY_TYPES[t] || WARRANTY_TYPES.shop).label;
+  const warrantyShort = (t) => (WARRANTY_TYPES[t] || WARRANTY_TYPES.shop).short;
+
+  const cents = (n) => Math.round((Number(n) || 0) * 100);
+
+  function money(c) {
+    const neg = c < 0; c = Math.abs(Math.round(c || 0));
+    const s = (c / 100).toFixed(2).split(".");
+    s[0] = s[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return (neg ? "-" : "") + s[0] + "." + s[1];
+  }
+
+  const esc = (s) => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  const pad = (n, w) => String(n).padStart(w, "0");
+
+  function isoToday() {
+    const d = new Date();
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1, 2)}-${pad(d.getDate(), 2)}`;
+  }
+
+  function addDays(isoDate, n) {
+    if (!isoDate) return null;
+    const [y, m, d] = isoDate.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + Number(n || 0));
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1, 2)}-${pad(dt.getDate(), 2)}`;
+  }
+
+  function niceDate(v) {
+    if (!v) return "\u2014";
+    const p = String(v).split("-");
+    if (p.length !== 3) return v;
+    return `${p[2]} ${MON[Number(p[1]) - 1]} ${p[0]}`;
+  }
+
+  /* -------------------------------------------------------
+     Tax engine — mirrors server.js exactly.
+       none      total = net
+       vat       VAT charged on net
+       vat_sscl  SSCL on net first, then VAT on (net + SSCL)
+       incl      prices already contain VAT; back it out
+  ------------------------------------------------------- */
+  function computeTotals(o) {
+    let subtotal_c = 0;
+    for (const it of (o.items || [])) subtotal_c += Math.round(it.amount_c || 0);
+
+    const discount_c = Math.min(Math.max(0, o.discount_c || 0), subtotal_c);
+    const net_c = subtotal_c - discount_c;
+    const v = Number(o.vat_rate) || 0;
+    const s = Number(o.sscl_rate) || 0;
+
+    let sscl_c = 0, taxable_c = net_c, vat_c = 0, incl_vat_c = 0, total_c = net_c;
+
+    if (o.tax_mode === "vat") {
+      vat_c = Math.round(net_c * v / 100);
+      total_c = net_c + vat_c;
+    } else if (o.tax_mode === "vat_sscl") {
+      sscl_c = Math.round(net_c * s / 100);
+      taxable_c = net_c + sscl_c;
+      vat_c = Math.round(taxable_c * v / 100);
+      total_c = taxable_c + vat_c;
+    } else if (o.tax_mode === "incl") {
+      incl_vat_c = Math.round(net_c * v / (100 + v));
+      total_c = net_c;
     }
-  } catch { /* fall through */ }
-  return [];
-}
-
-async function sendInvoiceEmail(inv) {
-  if (!mailEnabled()) {
-    return { sent: false, reason: "disabled", error: "Email is not configured." };
-  }
-  const to = String(inv.cust_email || "").trim();
-  if (!to) return { sent: false, reason: "no_address", error: "No customer email address." };
-  if (!looksLikeEmail(to)) {
-    return { sent: false, reason: "bad_address", error: `"${to}" does not look like an email address.` };
+    return { subtotal_c, discount_c, net_c, sscl_c, taxable_c, vat_c, incl_vat_c, total_c };
   }
 
-  let pdf = null;
-  try {
-    pdf = await require("./pdf.js").invoicePdfAttachment(inv);
-  } catch (e) {
-    /* A PDF failure must never stop the invoice reaching the customer.
-       The email still goes out with the HTML copy attached instead. */
-    console.error("PDF generation failed for " + inv.number + ":", e.stack || e.message);
+  const TAX_NOTES = {
+    none:     "No tax added. The total is simply the value of the goods. The VAT number is left off the invoice.",
+    vat:      "<b>VAT</b> is added on top of the item value.<br>Total = Value + VAT",
+    vat_sscl: "<b>SSCL is calculated first</b> on the item value. VAT is then charged on the value <i>plus</i> the SSCL.<br>Total = Value + SSCL + VAT&nbsp;on&nbsp;(Value&nbsp;+&nbsp;SSCL)",
+    incl:     "Item prices <b>already contain VAT</b>. Nothing is added \u2014 the VAT portion is shown separately for the customer's records."
+  };
+
+  /* -------------------------------------------------------
+     Document renderer
+     Accepts a normalised invoice and returns the paper HTML.
+  ------------------------------------------------------- */
+  /* A counter sale is settled on the spot, so a due date pointing at the
+     same day is noise. Show it only when the customer genuinely owes
+     money later. */
+  const showDue = (d) => Boolean(d.due_date) && d.due_date !== d.issue_date;
+
+  const telHref = (phone) => "tel:" + String(phone || "").replace(/[^\d+]/g, "");
+
+  /* Warranty terms are stored one point per line. A leading label
+     before the first colon is emphasised, so "Scope & Eligibility: ..."
+     reads as a heading and body rather than a wall of text. */
+  function termList(text) {
+    const lines = String(text || "").split("\n").map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) return "";
+    if (lines.length === 1) return `<p>${esc(lines[0])}</p>`;
+    return `<ul class="tlist">${lines.map((raw) => {
+      /* A line starting with ! is highlighted, for points the customer
+         must not miss. The marker itself is never printed. */
+      const hot = raw.startsWith("!");
+      const line = hot ? raw.slice(1).trim() : raw;
+      const i = line.indexOf(":");
+      const hasLabel = i > 0 && i < 60;
+      if (hot) {
+        const head = hasLabel ? esc(line.slice(0, i).trim()) : "";
+        const rest = hasLabel ? esc(line.slice(i + 1).trim()) : esc(line);
+        return `<li class="hot">${head ? `<span class="hh">${head}</span>` : ""}<span class="hb">${rest}</span></li>`;
+      }
+      if (hasLabel) {
+        return `<li><b>${esc(line.slice(0, i + 1))}</b> ${esc(line.slice(i + 1).trim())}</li>`;
+      }
+      return `<li>${esc(line)}</li>`;
+    }).join("")}</ul>`;
   }
 
-  const info = await getTransport().sendMail({
-    from: FROM(),
-    to,
-    replyTo: process.env.MAIL_REPLY_TO || FROM(),
-    subject: `${inv.tax_mode === "none" ? "Invoice" : "Tax invoice"} ${inv.number} from ${inv.biz_name || "I7SEVEN MOBILE"}`,
-    text: renderText(inv),
-    html: renderEmail(inv, pdf ? `${inv.number}.pdf` : `${inv.number}.html`),
-    attachments: logoAttachment().concat(pdf ? [pdf] : [invoiceAttachment(inv)])
-  });
+  /* Address as plain text; phone and email tappable. */
+  function contactBlock(d) {
+    const rows = [];
+    if ((d.biz_address || "").trim()) {
+      rows.push(`<div class="c-row">${esc(d.biz_address)}</div>`);
+    }
+    const line2 = [];
+    if ((d.biz_phone || "").trim()) {
+      line2.push(`<a class="c-row" href="${esc(telHref(d.biz_phone))}">${esc(d.biz_phone)}</a>`);
+    }
+    if ((d.biz_email || "").trim()) {
+      line2.push(`<a class="c-row" href="mailto:${esc(d.biz_email)}">${esc(d.biz_email)}</a>`);
+    }
+    if (!rows.length && !line2.length) return `<div class="biz">${esc(d.biz_lines || "")}</div>`;
+    return `<div class="biz">${rows.join("")}${line2.length ? `<div class="c-line">${line2.join('<span class="c-sep">\u00b7</span>')}</div>` : ""}</div>`;
+  }
 
-  return { sent: true, messageId: info.messageId, to };
-}
+  function renderPaper(d) {
+    const cur = d.currency || "";
+    const mode = d.tax_mode || "none";
+    const t = d.totals || computeTotals(d);
+    const lineShowsExpiry = (it) => {
+      if (it.show_expiry === false || it.show_expiry === 0) return false;
+      if (it.show_expiry === true  || it.show_expiry === 1) return true;
+      return d.show_warranty_expiry !== false && d.show_warranty_expiry !== 0;
+    };
+    const items = (d.items || []);
 
-async function verifyConnection() {
-  if (!mailEnabled()) throw new Error("SMTP_HOST and SMTP_USER are not set.");
-  return getTransport().verify();
-}
+    /* --- head band: VAT number only appears when a tax type is selected --- */
+    const vatBlock = (mode !== "none" && (d.vat_no || "").trim())
+      ? `<div class="vatno">VAT Reg. No.<b>${esc(d.vat_no)}</b></div>`
+      : "";
 
-module.exports = { mailEnabled, sendInvoiceEmail, renderEmail, renderText,
-                   looksLikeEmail, verifyConnection, FROM };
+    const head = `
+      <div class="head-band">
+        <div class="mark">
+          <img src="logo.png" alt="I7SEVEN">
+          <div class="sub">Mobile</div>
+        </div>
+        <div class="doc">
+          <div class="word">${mode === "none" ? "Invoice" : "Tax invoice"}</div>
+          <div class="num">${esc(d.number || "\u2014")}</div>
+          ${vatBlock}
+        </div>
+      </div>
+      <div class="lime-rule"></div>`;
+
+    /* --- billed-to, including NIC --- */
+    const custLines = [d.cust_name || "\u2014", d.cust_address || "", d.cust_phone || ""]
+      .filter(Boolean).join("\n");
+    const nicChip = (d.cust_nic || "").trim()
+      ? `<div class="nic-chip"><span>NIC</span>${esc(d.cust_nic)}</div>`
+      : "";
+
+    /* --- line items --- */
+    let lines;
+    if (!items.length) {
+      lines = `<tr><td colspan="5" class="empty-note">Add an item and it appears here.</td></tr>`;
+    } else {
+      lines = items.map((it, i) => {
+        const days = Number(it.warranty_days) || 0;
+        const until = it.warranty_until || (days ? addDays(d.issue_date, days) : null);
+        const imei = (it.imei || "").trim()
+          ? `<span class="imei-line">IMEI <b>${esc(it.imei)}</b></span>` : "";
+        /* "No Warranty" prints nothing at all. */
+        const w = (days > 0 && it.warranty_type !== "none")
+          ? `<span class="wtag ${esc(it.warranty_type || "shop")}">${esc(warrantyLabel(it.warranty_type))} <b>${days}</b> days${lineShowsExpiry(it) ? ` \u00b7 valid to ${niceDate(until)}` : ""}</span>`
+          : "";
+        return `<tr>
+          <td class="idx">${pad(i + 1, 2)}</td>
+          <td class="desc">${esc(it.description || "\u2014")}${imei}${w ? "<br>" + w : ""}</td>
+          <td class="r">${Number(it.qty) || 0}</td>
+          <td class="r">${money(it.unit_price_c)}</td>
+          <td class="r">${money(it.amount_c)}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    /* --- totals --- */
+    let rows = "";
+    rows += `<tr><td class="lab">${mode === "incl" ? "Subtotal (VAT inclusive)" : "Subtotal"}</td>
+             <td class="val">${cur} ${money(t.subtotal_c)}</td></tr>`;
+    if (t.discount_c) {
+      rows += `<tr><td class="lab">Discount</td><td class="val">-${cur} ${money(t.discount_c)}</td></tr>`;
+    }
+    if (mode === "vat_sscl") {
+      if (t.discount_c) {
+        rows += `<tr class="sep"><td class="lab">Value of goods</td><td class="val">${cur} ${money(t.net_c)}</td></tr>`;
+      }
+      rows += `<tr><td class="lab">SSCL ${Number(d.sscl_rate) || 0}%</td><td class="val">${cur} ${money(t.sscl_c)}</td></tr>`;
+      rows += `<tr class="sep"><td class="lab">Value liable to VAT</td><td class="val">${cur} ${money(t.taxable_c)}</td></tr>`;
+      rows += `<tr><td class="lab">VAT ${Number(d.vat_rate) || 0}%</td><td class="val">${cur} ${money(t.vat_c)}</td></tr>`;
+    } else if (mode === "vat") {
+      rows += `<tr><td class="lab">VAT ${Number(d.vat_rate) || 0}%</td><td class="val">${cur} ${money(t.vat_c)}</td></tr>`;
+    }
+    rows += `<tr class="grand"><td class="lab">Total due</td><td class="val">${cur} ${money(t.total_c)}</td></tr>`;
+
+    const inclNote = mode === "incl"
+      ? `<div class="vat-incl-note">Includes VAT ${Number(d.vat_rate) || 0}% of ${cur} ${money(t.incl_vat_c)}</div>`
+      : "";
+
+    /* --- warranty panel --- */
+    /* The item lines already carry type, days and expiry, so the warranty
+       box holds the terms only and does not repeat them. */
+    const warranty = (d.warranty_text || "").trim()
+      ? `<div class="warranty">
+           <div class="wh">Warranty terms &amp; conditions</div>
+           <div class="wb">${termList(d.warranty_text)}</div>
+         </div>`
+      : "";
+
+    const terms = (d.terms || "").trim()
+      ? `<div class="terms"><h3>Terms and conditions</h3>${termList(d.terms)}</div>` : "";
+
+    const footer = `<div class="footline">
+        <div>Thank you for your business.</div>
+        <div class="mono">${d.cashier ? "Served by " + esc(d.cashier) + " \u00b7 " : ""}info@iseven.lk</div>
+      </div>`;
+
+    return `${head}
+      <div class="pbody">
+        ${contactBlock(d)}
+        <div class="inv-meta">
+          <div class="meta-cell bill">
+            <div class="k">Billed to</div>
+            <div class="v">${esc(custLines)}</div>
+            ${nicChip}
+          </div>
+          <div class="meta-cell"><div class="k">Issued</div><div class="v mono">${niceDate(d.issue_date)}</div></div>
+          ${showDue(d) ? `<div class="meta-cell"><div class="k">Due</div><div class="v mono">${niceDate(d.due_date)}</div></div>` : ""}
+        </div>
+        <table class="lines">
+          <thead><tr><th></th><th>Description</th><th class="r">Qty</th><th class="r">Unit price</th><th class="r">Amount</th></tr></thead>
+          <tbody>${lines}</tbody>
+        </table>
+        <div class="sums"><table><tbody>${rows}</tbody></table></div>
+        ${inclNote}
+        ${warranty}
+        ${terms}
+        ${footer}
+      </div>`;
+  }
+
+  /* -------------------------------------------------------
+     Tiny fetch helper
+  ------------------------------------------------------- */
+  async function api(url, opts) {
+    const res = await fetch(url, Object.assign({
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin"
+    }, opts));
+    if (res.status === 401) {
+      location.href = "/login.html?next=" + encodeURIComponent(location.pathname);
+      throw new Error("Signing in\u2026");
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    return data;
+  }
+
+  global.I7 = { cents, money, esc, pad, isoToday, addDays, niceDate,
+                computeTotals, TAX_NOTES, renderPaper, api,
+                WARRANTY_TYPES, warrantyLabel, warrantyShort };
+})(window);

@@ -35,7 +35,7 @@ body{
   position:sticky;top:0;z-index:30;
 }
 .topbar .brand{display:flex;align-items:center;gap:14px}
-.topbar .brand img{height:19px;width:auto;display:block}
+.topbar .brand img{height:22px;width:auto;display:block}
 .navlinks{display:flex;gap:2px;border-left:1px solid var(--ink-3);padding-left:14px}
 .navlinks a{
   font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
@@ -145,11 +145,7 @@ select{cursor:pointer}
   background:var(--ink);padding:22px 44px;
   display:flex;align-items:flex-start;justify-content:space-between;gap:26px;
 }
-.head-band .mark img{height:38px;width:auto;display:block}
-.head-band .mark .sub{
-  font-size:9px;font-weight:700;letter-spacing:.42em;text-transform:uppercase;
-  color:var(--on-dark);margin-top:7px;padding-left:3px;
-}
+.head-band .mark img{height:44px;width:auto;display:block}
 .head-band .doc{text-align:right}
 .head-band .doc .word{
   font-size:10px;font-weight:700;letter-spacing:.3em;text-transform:uppercase;
@@ -458,7 +454,7 @@ input[type=number]::-webkit-inner-spin-button{
   .row2, .row3{grid-template-columns:1fr;gap:10px}
 
   .topbar{padding:10px 14px}
-  .topbar .brand img{height:17px}
+  .topbar .brand img{height:20px}
   .navlinks{padding-left:10px}
   .navlinks a{padding:8px 10px}
   /* the desktop buttons are replaced by the bar at the bottom */

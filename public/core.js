@@ -166,8 +166,7 @@
     const head = `
       <div class="head-band">
         <div class="mark">
-          <img src="logo.png" alt="I7SEVEN">
-          <div class="sub">Mobile</div>
+          <img src="logo.png" alt="I7SEVEN MOBILES">
         </div>
         <div class="doc">
           <div class="word">${mode === "none" ? "Invoice" : "Tax invoice"}</div>

@@ -1,5 +1,5 @@
 /* =========================================================
-   I7SEVEN MOBILE — local server (Supabase / PostgreSQL)
+   I7SEVEN MOBILES — local server (Supabase / PostgreSQL)
 
    Uses the same lib/billing.js as the Vercel functions, so the
    tax engine and queries can never drift between the two.

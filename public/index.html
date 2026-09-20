@@ -2,7 +2,7 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>New invoice — I7SEVEN MOBILE</title>
+<title>New invoice — I7SEVEN MOBILES</title>
 <link rel="icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -65,7 +65,7 @@
       <h2>Items</h2>
       <div id="item-list"></div>
       <button class="add-item" id="btn-add">+ Add item</button>
-      <p class="hint">Type warranty in <b>days</b> for each item. Untick <b>Show expiry date</b> on a line to print only the number of days. Choosing <b>No Warranty</b> leaves the line blank. IMEI is searchable from the dashboard.</p>
+      <p class="hint">Type warranty in <b>days</b> for each item. Use 0 for accessories sold without warranty. IMEI is searchable from the dashboard.</p>
     </div>
 
     <div class="group">
@@ -106,13 +106,6 @@
   </main>
 </div>
 
-<!-- Thumb-reach actions. Hidden above 920px, where the top bar is used. -->
-<div class="m-bar">
-  <button class="btn ghost narrow" id="m-preview">Preview</button>
-  <button class="btn ghost narrow" id="m-print">Print</button>
-  <button class="btn" id="m-save">Save invoice</button>
-</div>
-
 <script src="core.js"></script>
 <script>
 (function () {
@@ -123,9 +116,8 @@
   /* Overwritten from settings once they load, so a new item starts on
      whichever warranty the shop sells most. */
   let defaultWarrantyType = "apple_care";
-  const blankItem = () => ({ description: "", imei: "",
-                             warranty_type: defaultWarrantyType,
-                             show_expiry: true,
+  const blankItem = () => ({ description: "", imei: "", pack_items: "",
+                             warranty_type: defaultWarrantyType, show_expiry: true,
                              warranty_days: 0, qty: 1, unit_price: 0 });
   let items = [blankItem()];
   const editId = new URLSearchParams(location.search).get("edit");
@@ -173,6 +165,7 @@
       return {
         description: it.description,
         imei: it.imei,
+        pack_items: it.pack_items || "",
         warranty_type: it.warranty_type || "shop",
         show_expiry: it.show_expiry !== false,
         warranty_days: Math.max(0, parseInt(it.warranty_days, 10) || 0),
@@ -220,6 +213,11 @@
           <button class="kill" data-kill="${i}" aria-label="Remove item ${i + 1}">&times;</button>
         </div>
         <div class="field"><input data-f="description" data-i="${i}" placeholder="Item name" value="${I7.esc(it.description)}"></div>
+        <div class="field">
+          <label>What's in the pack <span class="opt">optional \u2014 one per line, no prices</span></label>
+          <textarea rows="3" data-f="pack_items" data-i="${i}" placeholder="JBL Speaker # SN12345 - 365&#10;Adaptor - 180&#10;Cable">${I7.esc(it.pack_items || "")}</textarea>
+          <p class="hint tight">Add <b># serial</b> and <b>- 180</b> after a line for that thing's serial and warranty days. Pack serials are searchable.</p>
+        </div>
         <div class="field"><label>IMEI / serial</label><input class="code" data-f="imei" data-i="${i}" placeholder="Optional \u2014 searchable" value="${I7.esc(it.imei)}"></div>
         <div class="row2">
           <div class="field"><label>Qty</label><input class="num" type="number" min="0" step="1" data-f="qty" data-i="${i}" value="${I7.esc(it.qty)}"></div>
@@ -260,13 +258,11 @@
     const el = e.target;
     if (el.dataset && el.dataset.f !== undefined) {
       const i = Number(el.dataset.i), f = el.dataset.f;
-      if (f === "show_expiry") {
-        items[i].show_expiry = el.checked;
-        renderPaper();
-        return;
-      }
-      items[i][f] = (f === "description" || f === "imei" || f === "warranty_type")
+      if (f === "show_expiry") { items[i].show_expiry = el.checked; renderPaper(); return; }
+      items[i][f] = (f === "description" || f === "imei" || f === "warranty_type"
+                     || f === "pack_items")
                    ? el.value : (el.value === "" ? 0 : Number(el.value));
+      if (f === "pack_items") { renderPaper(); return; }
       if (f === "warranty_type") {
         /* "No Warranty" carries no days, so clear the box and lock it. */
         if (el.value === "none") items[i].warranty_days = 0;
@@ -324,16 +320,6 @@
   });
 
   $("btn-print").addEventListener("click", () => window.print());
-  $("m-print").addEventListener("click", () => window.print());
-
-  /* The mobile buttons drive the same handlers as the top bar. */
-  $("m-save").addEventListener("click", () => $("btn-save").click());
-
-  $("m-preview").addEventListener("click", () => {
-    const showing = document.body.classList.toggle("show-preview");
-    $("m-preview").textContent = showing ? "Edit" : "Preview";
-    window.scrollTo({ top: 0 });
-  });
 
   $("btn-pdf").addEventListener("click", () => {
     if (savedId) window.open("/api/invoices/" + savedId + "/pdf", "_blank");
@@ -374,6 +360,7 @@
       warranty_text: d.warranty_text, terms: d.terms, cashier: d.cashier,
       items: items.map((it) => ({
         description: it.description, imei: it.imei,
+        pack_items: it.pack_items || "",
         warranty_type: it.warranty_type || "shop",
         show_expiry: it.show_expiry !== false,
         warranty_days: it.warranty_days, qty: it.qty, unit_price: it.unit_price
@@ -381,7 +368,6 @@
     };
 
     $("btn-save").disabled = true;
-    $("m-save").disabled = true;
     try {
       const out = editId
         ? await I7.api("/api/invoices/" + editId, { method: "PUT", body: JSON.stringify(payload) })
@@ -391,8 +377,6 @@
       $("saved-no").textContent = out.number;
       $("saved").classList.add("show");
       $("btn-save").textContent = editId ? "Changes saved" : "Saved";
-      $("m-save").textContent = $("btn-save").textContent;
-      $("m-save").disabled = true;
       $("btn-pdf").style.display = "inline-block";
       showMail(out.email);
       renderPaper();
@@ -400,7 +384,6 @@
     } catch (err) {
       showErr(err.message);
       $("btn-save").disabled = false;
-      $("m-save").disabled = false;
     }
   });
 
@@ -462,6 +445,7 @@
         $("terms").value = inv.terms || "";
         items = (inv.items || []).map((it) => ({
           description: it.description, imei: it.imei || "",
+          pack_items: it.pack_items || "",
           warranty_type: it.warranty_type || "shop",
           show_expiry: it.show_expiry !== false && it.show_expiry !== 0,
           warranty_days: it.warranty_days || 0,

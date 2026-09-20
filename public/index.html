@@ -135,6 +135,9 @@
   const editId = new URLSearchParams(location.search).get("edit");
   let savedNumber = null;
   let savedId = null;
+  /* The address the server currently holds, so the Send button can tell
+     an unsaved edit from the stored recipient. */
+  let savedEmail = "";
   let mailOn = false;
 
   /* Three states: ready to send, sent, or failed. */
@@ -339,6 +342,15 @@
 
   $("btn-send").addEventListener("click", async () => {
     if (!savedId) return;
+    /* The server emails whatever address is stored, so a freshly typed
+       one that has not been saved would send to the old recipient. */
+    if ($("cust_email").value.trim().toLowerCase() !== savedEmail) {
+      showErr("The email address has changed. Press " +
+              ($("btn-save").textContent.trim() || "Save") +
+              " first, then send.");
+      return;
+    }
+    showErr("");
     const btn = $("btn-send");
     btn.disabled = true;
     btn.textContent = "Sending\u2026";
@@ -386,6 +398,7 @@
         : await I7.api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
       savedNumber = out.number;
       savedId = out.id;
+      savedEmail = $("cust_email").value.trim().toLowerCase();
       $("saved-no").textContent = out.number;
       $("saved").classList.add("show");
       $("btn-save").textContent = editId ? "Changes saved" : "Saved";
@@ -469,6 +482,7 @@
       try {
         const inv = await I7.api("/api/invoices/" + editId);
         savedNumber = inv.number; savedId = inv.id;
+        savedEmail = (inv.cust_email || "").trim().toLowerCase();
         $("btn-pdf").style.display = "inline-block";
         $("cust_name").value = inv.cust_name || "";
         $("cust_nic").value = inv.cust_nic || "";
@@ -499,6 +513,14 @@
         $("btn-save").textContent = "Save changes";
         $("edit-note").classList.add("show");
         $("edit-no").textContent = inv.number;
+        /* An invoice opened for editing is already saved, so if it has
+           an address the Send button belongs on screen straight away
+           rather than only after another save. */
+        showMail(inv.cust_email
+          ? (inv.email_status === "sent"
+              ? { sent: true, to: inv.cust_email }
+              : { sent: false, reason: "not_sent" })
+          : null);
       } catch (e) { showErr("Could not load that invoice: " + e.message); }
     }
 

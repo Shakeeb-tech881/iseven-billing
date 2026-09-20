@@ -1,5 +1,5 @@
 -- ===========================================================
--- I7SEVEN MOBILE — Supabase / PostgreSQL schema
+-- I7SEVEN MOBILES — Supabase / PostgreSQL schema
 -- Paste this whole file into the Supabase SQL Editor and Run.
 -- Safe to run more than once.
 -- ===========================================================
@@ -110,17 +110,21 @@ INSERT INTO counters (name, value) VALUES ('invoice', 0)
   ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO settings (key, value) VALUES
-  ('biz_name',      'I7SEVEN MOBILE'),
-  ('biz_lines',     E'Colombo, Sri Lanka\n+94 00 000 0000 \u00b7 info@iseven.lk'),
-  ('vat_no',        ''),
-  ('number_prefix', 'I7-'),
-  ('currency',      'LKR'),
-  ('vat_rate',      '18'),
-  ('sscl_rate',     '2.5'),
-  ('tax_mode',      'none'),
-  ('payment_days',  '14'),
-  ('warranty_text', 'Warranty covers manufacturing defects only. Physical damage, liquid damage, burn marks and any unauthorised repair void the warranty. The original invoice must be produced to make a claim. Software issues and consumable parts are not covered.'),
-  ('terms',         E'Payment is due by the date shown above.\nGoods remain the property of I7SEVEN MOBILE until paid for in full.\nGoods once sold are not returnable or exchangeable except under warranty.\nPlease quote the invoice number with your payment.')
+  ('biz_name',              'I7SEVEN MOBILES'),
+  ('biz_lines',             E'No. 63, First Floor, Liberty Plaza, Colombo 03\n+94 77 311 1999 · info@iseven.lk'),
+  ('biz_address',           'No. 63, First Floor, Liberty Plaza, Colombo 03'),
+  ('biz_phone',             '+94 77 311 1999'),
+  ('biz_email',             'info@iseven.lk'),
+  ('vat_no',                ''),
+  ('number_prefix',         'I7-'),
+  ('currency',              'LKR'),
+  ('vat_rate',              '18'),
+  ('sscl_rate',             '2.5'),
+  ('tax_mode',              'none'),
+  ('payment_days',          '14'),
+  ('warranty_type_default', 'apple_care'),
+  ('warranty_text',         E'!Warranty Shipping at No Additional Cost: Simply hand over your device at our showroom, and we’ll take care of the LKR 25,000 shipping cost.\nScope & Eligibility: This warranty is non-transferable and applies strictly to the original purchaser named on this invoice. The original invoice must be produced for every claim.\nClaim Window: Warranty claims must be handed over to us no later than 14 days before the warranty end date shown above. Devices brought in during the final 14 days cannot be accepted, as there must be sufficient cover remaining for the claim to be processed.\nService Provider: All Apple warranty claims are processed through Apple Authorized Service Providers.\nReplacement Policy: Replacements cover only the defective unit or the individual part, such as an earpiece, and never a full retail boxed set. MacBooks are serviced by replacing the defective component rather than the entire device.\nProcessing & Support: Claim processing may take 45 days or longer. Loan devices are not provided under any circumstances.\nWarranty Exclusions: Physical damage, liquid contact and burn damage void the warranty entirely. Display and touch-related hardware faults are excluded from coverage.\nSoftware & Modifications: Coverage applies only to official operating system firmware. Jailbreaking or rooting the device cancels all warranty coverage immediately.\nAccessories & Battery: Battery, charger, data cable and handsfree carry a limited 6-month warranty.\nFinal Authority: Devices requiring user-direct claim handling must be taken directly to an Apple Authorized Service Provider. All decisions made by Apple are final.'),
+  ('terms',                 '')
 ON CONFLICT (key) DO NOTHING;
 
 -- ===========================================================
@@ -145,3 +149,11 @@ CREATE INDEX IF NOT EXISTS idx_item_wtype ON items (warranty_type);
 -- New installs default to no tax; change it in Settings when you register.
 UPDATE settings SET value = 'none' WHERE key = 'tax_mode' AND value = 'vat'
   AND NOT EXISTS (SELECT 1 FROM invoices);
+
+-- ===========================================================
+-- Per-item expiry choice, and pack contents: the things inside a
+-- bundle, listed on the invoice without individual prices.
+-- Safe to run on an existing database.
+-- ===========================================================
+ALTER TABLE items ADD COLUMN IF NOT EXISTS show_expiry boolean NOT NULL DEFAULT true;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS pack_items  text;

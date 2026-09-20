@@ -1,9 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-
-  "//": "Run the server in Mumbai, the same city as the Supabase database (ap-south-1). Saving an invoice makes seven round trips to the database in one transaction, so with the function in the United States each save crossed the world seven times and took seconds. Same-region cuts each trip from roughly 250ms to about 5ms. Mumbai is also the closest Vercel region to Colombo.",
   "regions": ["bom1"],
-
   "headers": [
     {
       "source": "/(.*)",
@@ -23,4 +20,5 @@
       ]
     }
   ]
+}
 }

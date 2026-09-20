@@ -1,5 +1,5 @@
 /* ==========================================================
-   I7SEVEN MOBILE — shared client library
+   I7SEVEN MOBILES — shared client library
    Tax engine, formatting, and the printed-document renderer.
    Used by both the new-invoice page and the dashboard.
    ========================================================== */
@@ -102,6 +102,42 @@
      money later. */
   const showDue = (d) => Boolean(d.due_date) && d.due_date !== d.issue_date;
 
+
+  /* The cashier may or may not type "SN" themselves, so the label is only
+     added when it is missing. */
+  function serialLabel(serial) {
+    const v = String(serial || "").trim();
+    if (!v) return "";
+    /* Already labelled when it reads like SN…/S-N…/S/N… before a number. */
+    return /^s[\/.\s-]?n[\s\-:.]*\d/i.test(v) ? v : "SN " + v;
+  }
+
+  /* A pack line is "Name", optionally "# serial", optionally a warranty in
+     days after a spaced dash or a pipe:
+
+       Adaptor
+       Adaptor - 180
+       JBL Speaker # SN12345
+       JBL Speaker # SN12345 - 365
+
+     The dash must have spaces around it, so model numbers survive intact:
+     "USB-3", "Charger 20W-2" and a serial like "ABC-123" are never read
+     as a warranty. */
+  function parsePackLine(raw) {
+    let line = String(raw == null ? "" : raw).trim();
+    let days = 0;
+
+    const dm = line.match(/^(.*\S)\s*\|\s*(\d{1,5})\s*(?:days?)?$/i)
+            || line.match(/^(.*\S)\s+[-–—]\s+(\d{1,5})\s*(?:days?)?$/i);
+    if (dm) { line = dm[1].trim(); days = Number(dm[2]); }
+
+    let serial = "";
+    const sm = line.match(/^(.*\S)\s*#\s*(\S.*)$/);
+    if (sm) { line = sm[1].trim(); serial = sm[2].trim(); }
+
+    return { name: line, serial, days };
+  }
+
   const telHref = (phone) => "tel:" + String(phone || "").replace(/[^\d+]/g, "");
 
   /* Warranty terms are stored one point per line. A leading label
@@ -193,13 +229,26 @@
         const until = it.warranty_until || (days ? addDays(d.issue_date, days) : null);
         const imei = (it.imei || "").trim()
           ? `<span class="imei-line">IMEI <b>${esc(it.imei)}</b></span>` : "";
+        /* Pack contents: what is in the bundle, listed without prices. */
+        const packLines = String(it.pack_items || "")
+          .split("\n").map((l) => l.trim()).filter(Boolean);
+        const pack = packLines.length
+          ? `<span class="pack">${packLines.map((l) => {
+              const pi = parsePackLine(l);
+              const sn = pi.serial ? ` <span class="psn">${esc(serialLabel(pi.serial))}</span>` : "";
+              if (!pi.days) return `<span>${esc(pi.name)}${sn}</span>`;
+              const pUntil = addDays(d.issue_date, pi.days);
+              const pExp = lineShowsExpiry(it) && pUntil ? ` \u00b7 valid to ${niceDate(pUntil)}` : "";
+              return `<span>${esc(pi.name)}${sn} <b class="pw">${pi.days} days warranty</b>${pExp}</span>`;
+            }).join("")}</span>`
+          : "";
         /* "No Warranty" prints nothing at all. */
         const w = (days > 0 && it.warranty_type !== "none")
           ? `<span class="wtag ${esc(it.warranty_type || "shop")}">${esc(warrantyLabel(it.warranty_type))} <b>${days}</b> days${lineShowsExpiry(it) ? ` \u00b7 valid to ${niceDate(until)}` : ""}</span>`
           : "";
         return `<tr>
           <td class="idx">${pad(i + 1, 2)}</td>
-          <td class="desc">${esc(it.description || "\u2014")}${imei}${w ? "<br>" + w : ""}</td>
+          <td class="desc">${esc(it.description || "\u2014")}${imei}${pack}${w ? "<br>" + w : ""}</td>
           <td class="r">${Number(it.qty) || 0}</td>
           <td class="r">${money(it.unit_price_c)}</td>
           <td class="r">${money(it.amount_c)}</td>

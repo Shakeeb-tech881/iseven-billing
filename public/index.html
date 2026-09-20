@@ -17,7 +17,10 @@
       <a href="dashboard.html">Dashboard</a>
     </nav>
   </div>
-  <div class="bar-actions">
+  <!-- till-actions marks the set the phone bar at the foot repeats, so
+       only these are hidden on a phone. The dashboard's toolbar has no
+       replacement and must stay visible. -->
+  <div class="bar-actions till-actions">
     <button class="btn ghost" id="btn-clear">Clear</button>
     <button class="btn ghost" id="btn-pdf" style="display:none">PDF</button>
     <button class="btn ghost" id="btn-print">Print</button>
@@ -104,6 +107,15 @@
   <main class="stage">
     <div class="paper" id="paper"></div>
   </main>
+</div>
+
+<!-- On a phone the toolbar buttons are hidden and these take over, fixed
+     within thumb reach. They drive the same handlers as the desktop ones. -->
+<div class="m-bar">
+  <button class="btn ghost narrow" id="m-clear" aria-label="Clear the form">Clear</button>
+  <button class="btn ghost" id="m-preview">Preview</button>
+  <button class="btn ghost narrow" id="m-print" aria-label="Print">Print</button>
+  <button class="btn" id="m-save">Save</button>
 </div>
 
 <script src="core.js"></script>
@@ -391,6 +403,37 @@
     if (savedNumber && !confirm("Start a new blank invoice?")) return;
     location.reload();
   });
+
+  /* ---------- phone action bar ----------
+     The form and the preview cannot both fit on a phone, so the bar
+     swaps between them and relays the other taps to the toolbar
+     buttons, which keeps one copy of every handler. */
+  const relay = (from, to) =>
+    $(from).addEventListener("click", () => $(to).click());
+  relay("m-clear", "btn-clear");
+  relay("m-print", "btn-print");
+  relay("m-save",  "btn-save");
+
+  $("m-preview").addEventListener("click", () => {
+    const showing = document.body.classList.toggle("show-preview");
+    $("m-preview").textContent = showing ? "Edit" : "Preview";
+    if (showing) renderPaper();
+    window.scrollTo({ top: 0 });
+  });
+
+  /* The phone bar mirrors the toolbar's Save button, shortened to fit.
+     The toolbar button stays disabled after a successful save so the
+     invoice cannot be written twice, so "saved" is read from the label
+     rather than from the disabled flag. */
+  const mirrorSave = () => {
+    const src = $("btn-save"), dst = $("m-save");
+    const label = src.textContent.trim();
+    const done = /saved/i.test(label);
+    dst.textContent = done ? "Saved" : (src.disabled ? "Saving…" : "Save");
+    dst.disabled = src.disabled;
+  };
+  new MutationObserver(mirrorSave).observe($("btn-save"),
+    { childList: true, characterData: true, subtree: true, attributes: true });
 
   /* ---------- boot ---------- */
   (async function init() {

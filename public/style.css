@@ -333,6 +333,7 @@ table.rt td .sub{display:block;font-size:10.5px;color:var(--on-dark-soft);margin
 .viewer .vbar .t{
   font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--on-dark-soft);
 }
+.viewer .vacts{display:flex;gap:8px}
 
 @media (max-width:920px){
   .shell{grid-template-columns:1fr}
@@ -441,6 +442,10 @@ input[type=number]::-webkit-inner-spin-button{
    preview is hidden behind a toggle and the actions move to a
    fixed bar within thumb reach.
    ========================================================== */
+/* Hidden on a desktop. Declared BEFORE the phone rules below so the
+   later rule wins — media queries carry no extra specificity. */
+.m-bar{display:none}
+
 @media (max-width: 920px){
 
   /* iOS zooms the page when a focused input is under 16px. */
@@ -459,7 +464,13 @@ input[type=number]::-webkit-inner-spin-button{
   .navlinks a{padding:8px 10px}
   /* the desktop buttons are replaced by the bar at the bottom */
   .shell ~ .m-bar, .m-bar{display:flex}
-  .topbar .bar-actions{display:none}
+  /* Only the till's own buttons are dropped, because the phone bar
+     repeats them. Hiding every toolbar left the dashboard with no way
+     to sign out. */
+  .topbar .till-actions{display:none}
+  .topbar{flex-wrap:wrap;row-gap:8px}
+  .topbar .bar-actions{gap:8px}
+  .topbar .bar-actions .btn{padding:9px 12px;font-size:11px}
 
   .entry{padding:18px 14px 96px}
   .item{padding:12px}
@@ -495,9 +506,16 @@ input[type=number]::-webkit-inner-spin-button{
   table.rt td{padding:13px 10px;font-size:13px}
   .mini{padding:8px 11px;font-size:10.5px;margin:2px 0 2px 5px}
   td.acts{white-space:normal}
-  .viewer{padding:12px 8px 40px}
+  /* Opaque on a phone: the translucent overlay let the dashboard
+     toolbar show through behind these buttons and the two read as
+     one jumbled row. */
+  .viewer{padding:12px 8px 40px;background:var(--ink)}
   .viewer .vbar{flex-wrap:wrap;gap:8px}
-  .viewer .vbar .btn{flex:1;padding:11px 8px}
+  .viewer .vbar .t{width:100%;order:-1}
+  /* Five buttons cannot sit on one phone row, so they wrap onto two
+     and share the width evenly. */
+  .viewer .vacts{flex-wrap:wrap;width:100%;gap:8px}
+  .viewer .vacts .btn{flex:1 1 30%;padding:11px 6px;font-size:10.5px;white-space:nowrap}
 
   /* the paper itself */
   .paper{box-shadow:0 6px 18px rgba(0,0,0,.4)}
@@ -506,11 +524,17 @@ input[type=number]::-webkit-inner-spin-button{
   .inv-meta{gap:18px;padding:13px 0}
   table.lines td{font-size:12.5px;padding:9px 0}
   table.lines td.r{padding-left:8px}
+  /* "UNIT PRICE" wrapped onto two lines at phone width and pushed into
+     the amount column, so the heads are tightened and kept on one line. */
+  table.lines th{font-size:7.5px;letter-spacing:.9px;white-space:nowrap}
+  table.lines th.r{padding-left:8px}
   .sums table{min-width:0;width:100%}
 }
 
-/* Never show the mobile bar on a desktop, and never in print. */
-.m-bar{display:none}
+/* Never in print. The desktop default is declared before the phone
+   media query instead of after it, because a media query adds no
+   specificity: sitting here it used to override the rule that shows
+   the bar, and a phone got no buttons at all. */
 @media print{ .m-bar{display:none !important} }
 
 /* ---- warranty / terms bullet list ---- */

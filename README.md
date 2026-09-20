@@ -1,4 +1,4 @@
-# I7SEVEN MOBILE — Billing system
+# I7SEVEN MOBILES — Billing system
 
 Invoicing with a database, a dashboard, and lookup by NIC or IMEI.
 No npm packages, no build step, no paid services.
@@ -506,37 +506,29 @@ a font size is a one-line edit.
 
 # Vercel: two things that must be right
 
-## 1. Vercel must run `api/index.js`, not `server.js`
+## 1. `server.js` is the entrypoint
 
-If `server.js` is present in the deployment, Vercel starts it as a legacy
-long-running server. You will see `Legacy server listening...` in the function
-log. In that mode the `functions` block in `vercel.json` is ignored, so
-`includeFiles` never applies and PDF generation fails.
-
-`.vercelignore` excludes `server.js` and `server-supabase.js` from the
-deployment. They stay in your repo for local use; Vercel simply does not
-deploy them.
+Vercel runs `server.js`; it will not start without one. Do not add it to
+`.vercelignore` — you get `No entrypoint found in "/vercel/path0"`.
+`api/index.js` stays in the repo but is unused on this setup.
 
 ## 2. PDFKit's fonts must be bundled
 
-PDFKit loads its font metrics lazily from
-`node_modules/pdfkit/js/standard-fonts/Helvetica.cjs` the first time you draw
-text. Vercel's bundler only traces `require()` calls it can see in the source,
-so that folder is left out and you get:
+PDFKit loads its font metrics lazily the first time you draw text. Vercel's
+bundler only follows `require()` calls it can see in the source, so the font
+folder was left out and the first PDF failed with:
 
 ```
 Cannot find module '/var/task/node_modules/pdfkit/js/standard-fonts/Helvetica.cjs'
 ```
 
-`vercel.json` fixes this:
+The fix is at the top of `lib/pdf.js`: a block of literal `require()` calls
+naming each font file by relative path. They are there purely so the bundler
+can see them, and are wrapped in try/catch since they only affect bundling.
 
-```json
-"functions": {
-  "api/index.js": { "includeFiles": "{node_modules/pdfkit/js/**,public/logo.png}" }
-}
-```
-
-About 6.6 MB, well inside Vercel's 250 MB function limit.
+A subpath import like `require("pdfkit/js/standard-fonts/Helvetica.cjs")` will
+not work — the package blocks it with `ERR_PACKAGE_PATH_NOT_EXPORTED`. A plain
+relative file path is allowed.
 
 When PDF generation does fail, the invoice email still goes out with an HTML
 copy attached, and the banner names whichever file was actually attached. The

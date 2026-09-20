@@ -2,7 +2,7 @@
   "name": "i7seven-billing",
   "version": "1.0.0",
   "private": true,
-  "description": "I7SEVEN MOBILE billing system",
+  "description": "I7SEVEN MOBILES billing system",
   "scripts": {
     "start": "node server.js",
     "dev": "node --env-file=.env.local server.js"

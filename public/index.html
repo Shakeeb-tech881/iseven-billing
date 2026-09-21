@@ -129,9 +129,13 @@
      whichever warranty the shop sells most. */
   let defaultWarrantyType = "apple_care";
   const blankItem = () => ({ description: "", imei: "", pack_items: "",
-                             warranty_type: defaultWarrantyType, show_expiry: true,
+                             warranty_type: defaultWarrantyType, show_expiry: true, show_days: true,
                              warranty_days: 0, qty: 1, unit_price: 0 });
   let items = [blankItem()];
+  /* The cover options matter when the line has a warranty of its own, or
+     when its pack lists something with days after it ("Adaptor - 180"). */
+  const showOpts = (it) => it.warranty_type !== "none"
+    || /(?:\s[-\u2013\u2014]\s|\|)\s*\d{1,5}\s*(?:days?)?\s*$/im.test(it.pack_items || "");
   const editId = new URLSearchParams(location.search).get("edit");
   let savedNumber = null;
   let savedId = null;
@@ -183,6 +187,7 @@
         pack_items: it.pack_items || "",
         warranty_type: it.warranty_type || "shop",
         show_expiry: it.show_expiry !== false,
+        show_days: it.show_days !== false,
         warranty_days: Math.max(0, parseInt(it.warranty_days, 10) || 0),
         qty, unit_price_c,
         amount_c: Math.round(qty * unit_price_c)
@@ -249,10 +254,16 @@
           </div>
           <div class="field"><label>Warranty days</label><input class="num" type="number" min="0" step="1" data-f="warranty_days" data-i="${i}" value="${I7.esc(it.warranty_days)}"${it.warranty_type === "none" ? " disabled" : ""}></div>
         </div>
-        <label class="cbx-row tight"${it.warranty_type === "none" ? ' style="display:none"' : ""}>
-          <input type="checkbox" data-f="show_expiry" data-i="${i}"${it.show_expiry === false ? "" : " checked"}>
-          <span>Show expiry date on this line</span>
-        </label>
+        <div class="cover-opts" data-opts="${i}"${showOpts(it) ? "" : ' style="display:none"'}>
+          <label class="cbx-row tight">
+            <input type="checkbox" data-f="show_days" data-i="${i}"${it.show_days === false ? "" : " checked"}>
+            <span>Show number of days <span class="eg">(365 days)</span></span>
+          </label>
+          <label class="cbx-row tight">
+            <input type="checkbox" data-f="show_expiry" data-i="${i}"${it.show_expiry === false ? "" : " checked"}>
+            <span>Show expiry date <span class="eg">(valid to &hellip;)</span></span>
+          </label>
+        </div>
         <div class="line-total">${I7.esc($("currency").value)} ${I7.money(lt)}</div>
       </div>`;
     }).join("");
@@ -273,11 +284,17 @@
     const el = e.target;
     if (el.dataset && el.dataset.f !== undefined) {
       const i = Number(el.dataset.i), f = el.dataset.f;
-      if (f === "show_expiry") { items[i].show_expiry = el.checked; renderPaper(); return; }
+      if (f === "show_expiry" || f === "show_days") {
+        items[i][f] = el.checked; renderPaper(); return;
+      }
       items[i][f] = (f === "description" || f === "imei" || f === "warranty_type"
                      || f === "pack_items")
                    ? el.value : (el.value === "" ? 0 : Number(el.value));
-      if (f === "pack_items") { renderPaper(); return; }
+      if (f === "pack_items") {
+        const o = document.querySelector(`[data-opts="${i}"]`);
+        if (o) o.style.display = showOpts(items[i]) ? "" : "none";
+        renderPaper(); return;
+      }
       if (f === "warranty_type") {
         /* "No Warranty" carries no days, so clear the box and lock it. */
         if (el.value === "none") items[i].warranty_days = 0;
@@ -387,6 +404,7 @@
         pack_items: it.pack_items || "",
         warranty_type: it.warranty_type || "shop",
         show_expiry: it.show_expiry !== false,
+        show_days: it.show_days !== false,
         warranty_days: it.warranty_days, qty: it.qty, unit_price: it.unit_price
       }))
     };
@@ -505,6 +523,7 @@
           pack_items: it.pack_items || "",
           warranty_type: it.warranty_type || "shop",
           show_expiry: it.show_expiry !== false && it.show_expiry !== 0,
+          show_days: it.show_days !== false && it.show_days !== 0,
           warranty_days: it.warranty_days || 0,
           qty: it.qty, unit_price: (it.unit_price_c || 0) / 100
         }));

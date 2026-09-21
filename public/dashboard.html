@@ -151,10 +151,14 @@
     try {
       const rows = await I7.api("/api/invoices?" + p.toString());
       const total = rows.reduce((a, r) => a + r.total_c, 0);
+      const today = document.body.dataset.role === "cashier" ? " today" : "";
       $("rcount").textContent = rows.length
-        ? `${rows.length} invoice${rows.length === 1 ? "" : "s"}`
-        : "No results";
-      $("rsum").textContent = rows.length ? `Total ${rows[0].currency || "LKR"} ${I7.money(total)}` : "";
+        ? `${rows.length} invoice${rows.length === 1 ? "" : "s"}${today}`
+        : (today ? "No invoices yet today" : "No results");
+      /* The takings sum is removed from the page for cashiers, so it may
+         not exist; writing to it unguarded crashed the whole search. */
+      const rsum = $("rsum");
+      if (rsum) rsum.textContent = rows.length ? `Total ${rows[0].currency || "LKR"} ${I7.money(total)}` : "";
       $("nores").style.display = rows.length ? "none" : "block";
 
       $("rows").innerHTML = rows.map((r) => {
@@ -167,10 +171,11 @@
           <td style="font-size:11px">${r.cust_email ? I7.esc(r.cust_email) : "<span style='opacity:.35'>\u2014</span>"}${epill(r.email_status)}</td>
           <td class="r mono">${I7.niceDate(r.issue_date)}<span class="sub"><span class="tag">${modeTag}</span></span></td>
           ${document.body.dataset.role === "cashier" ? "" : `<td class="r mono" style="font-weight:700">${I7.money(r.total_c)}</td>`}
-          ${document.body.dataset.role === "cashier" ? "" : `<td class="r acts">
+          <td class="r acts">
              <button class="mini" data-edit="${r.id}">Edit</button>
-             <button class="mini del" data-del="${r.id}" data-no="${I7.esc(r.number)}">Delete</button>
-           </td>`}
+             ${document.body.dataset.role === "cashier" ? "" :
+               `<button class="mini del" data-del="${r.id}" data-no="${I7.esc(r.number)}">Delete</button>`}
+           </td>
         </tr>`;
       }).join("");
     } catch (e) {
@@ -318,7 +323,12 @@
         if (th.textContent.trim() === "Total") th.remove();
       });
       document.body.dataset.role = "cashier";
-      $("v-edit").style.display = "none";
+      /* The server only returns today's invoices to a cashier, so the date
+         filters would do nothing. Hidden, not removed: search() reads them. */
+      document.querySelector(".chips").style.display = "none";
+      $("from").closest(".field").style.display = "none";
+      $("to").closest(".field").style.display = "none";
+      $("q").placeholder = "Search today's invoices \u2014 NIC, IMEI, number, name\u2026";
     } else {
       loadStats();
     }

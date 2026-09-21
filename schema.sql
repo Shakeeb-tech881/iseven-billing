@@ -156,4 +156,5 @@ UPDATE settings SET value = 'none' WHERE key = 'tax_mode' AND value = 'vat'
 -- Safe to run on an existing database.
 -- ===========================================================
 ALTER TABLE items ADD COLUMN IF NOT EXISTS show_expiry boolean NOT NULL DEFAULT true;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS show_days   boolean NOT NULL DEFAULT true;
 ALTER TABLE items ADD COLUMN IF NOT EXISTS pack_items  text;

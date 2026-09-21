@@ -606,3 +606,8 @@ input[type=number]::-webkit-inner-spin-button{
 .hint.tight{margin:5px 0 0;font-size:11px}
 .pack .pw{color:var(--text);font-weight:700}
 .pack .psn{font-family:var(--mono);font-size:9.5px;color:var(--text-soft)}
+
+/* ---- per-line cover options: days and expiry date ---- */
+.cover-opts{display:flex;flex-wrap:wrap;gap:0 18px}
+.cover-opts .cbx-row.tight{margin-top:6px}
+.cover-opts .eg{opacity:.6}

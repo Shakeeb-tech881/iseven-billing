@@ -93,7 +93,8 @@ const server = http.createServer(async (req, res) => {
       if (auth.requiresAdmin(req.method, p) && !auth.isAdmin(req))
         return json(res, 403, { error: "Admin access only." });
 
-      const out = await billing.handleApi(req.method, p, url.searchParams, body);
+      const out = await billing.handleApi(req.method, p, url.searchParams, body,
+                                        auth.sessionRole(req));
       if (out.binary) {
         res.writeHead(out.code, {
           "Content-Type": out.contentType,

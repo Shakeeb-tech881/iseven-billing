@@ -2,7 +2,7 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>New invoice — I7SEVEN MOBILES</title>
+<title>Dashboard — I7SEVEN MOBILES</title>
 <link rel="icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,109 +13,88 @@
   <div class="brand">
     <img src="logo.png" alt="I7SEVEN">
     <nav class="navlinks">
-      <a href="/" class="on">New invoice</a>
-      <a href="dashboard.html">Dashboard</a>
+      <a href="/">New invoice</a>
+      <a href="dashboard.html" class="on">Dashboard</a>
     </nav>
   </div>
-  <!-- till-actions marks the set the phone bar at the foot repeats, so
-       only these are hidden on a phone. The dashboard's toolbar has no
-       replacement and must stay visible. -->
-  <div class="bar-actions till-actions">
-    <button class="btn ghost" id="btn-clear">Clear</button>
-    <button class="btn ghost" id="btn-pdf" style="display:none">PDF</button>
-    <button class="btn ghost" id="btn-print">Print</button>
-    <button class="btn" id="btn-save">Save invoice</button>
+  <div class="bar-actions">
+    <span class="role-tag" id="role-tag" style="display:none"></span>
+    <button class="btn ghost" id="btn-logout">Sign out</button>
+    <button class="btn" onclick="location.href='/'">+ New invoice</button>
   </div>
 </div>
 
-<div class="shell">
-  <aside class="entry">
-    <div class="err" id="err"></div>
-    <div class="edit-note" id="edit-note">
-      Editing <b id="edit-no"></b> — the invoice number will not change.
-      Use <b>Send email</b> afterwards if the customer needs the corrected copy.
-    </div>
-    <div class="saved-flag" id="saved">Saved as <span class="n" id="saved-no"></span></div>
-    <div class="mail-flag" id="mailflag">
-      <span id="mailmsg"></span>
-      <button class="btn sm" id="btn-send" style="display:none">Send email</button>
-    </div>
+<div class="dash">
+  <div class="stats" id="stats"></div>
 
-    <div class="group">
-      <h2>Customer</h2>
-      <div class="field"><label>Name <b style="color:var(--lime)">*</b></label><input id="cust_name" placeholder="Full name"></div>
-      <div class="field"><label>NIC number</label><input class="code" id="cust_nic" placeholder="200012345678 or 901234567V"></div>
-      <div class="field"><label>Phone</label><input class="code" id="cust_phone" placeholder="+94 77 000 0000"></div>
-      <div class="field"><label>Email <span id="mail-on" style="color:var(--lime)">· invoice sent here automatically</span></label><input type="email" id="cust_email" placeholder="customer@example.com"></div>
-      <div class="field"><label>Address</label><textarea rows="2" id="cust_address"></textarea></div>
-      <p class="hint">NIC is how you look this customer up later. It is stored and printed on the invoice. Nothing is emailed until you press <b>Send email</b> after saving.</p>
-    </div>
-
-    <div class="group">
-      <h2>Invoice</h2>
-      <div class="row2">
-        <div class="field"><label>Issue date</label><input type="date" id="issue_date"></div>
-        <div class="field"><label>Due date <span style="color:var(--on-dark-soft);text-transform:none;letter-spacing:0">(credit sales only)</span></label><input type="date" id="due_date"></div>
+  <div class="searchbar">
+    <div class="srow">
+      <div class="field" style="margin:0">
+        <label>Search</label>
+        <input class="big code" id="q" placeholder="Type an NIC, IMEI, invoice number, name or phone…" autofocus>
       </div>
-      <div class="row2">
-        <div class="field"><label>Currency</label><input id="currency"></div>
-        <div class="field"><label>Served by</label><input id="cashier" placeholder="Cashier name"></div>
-      </div>
-      <p class="hint">The invoice number is issued by the system when you save, in unbroken sequence. Leave the due date blank for a normal counter sale — it is only printed when the customer owes money later.</p>
-    </div>
-
-    <div class="group">
-      <h2>Items</h2>
-      <div id="item-list"></div>
-      <button class="add-item" id="btn-add">+ Add item</button>
-      <p class="hint">Type warranty in <b>days</b> for each item. Use 0 for accessories sold without warranty. IMEI is searchable from the dashboard.</p>
-    </div>
-
-    <div class="group">
-      <h2>Tax</h2>
-      <div class="field">
-        <label>Tax treatment</label>
-        <select id="tax_mode">
-          <option value="none">No VAT</option>
-          <option value="vat">VAT 18%</option>
-          <option value="vat_sscl">VAT + SSCL</option>
-          <option value="incl">Price includes VAT 18%</option>
+      <div class="field" style="margin:0">
+        <label>Search in</label>
+        <select id="field">
+          <option value="all">Everything</option>
+          <option value="nic">NIC number</option>
+          <option value="imei">IMEI / serial</option>
+          <option value="number">Invoice number</option>
+          <option value="name">Customer name</option>
         </select>
       </div>
-      <div id="vat-fields">
-        <div class="row2">
-          <div class="field"><label>VAT %</label><input class="num" type="number" min="0" step="0.01" id="vat_rate"></div>
-          <div class="field" id="sscl-field"><label>SSCL %</label><input class="num" type="number" min="0" step="0.01" id="sscl_rate"></div>
-        </div>
-        <div class="field"><label>VAT registration no.</label><input class="code" id="vat_no" placeholder="Shown at the top of the invoice"></div>
-      </div>
-      <div class="field"><label>Discount</label><input class="num" type="number" min="0" step="0.01" id="discount" value="0"></div>
-      <div class="taxnote" id="tax-note"></div>
+      <div class="field" style="margin:0"><label>From</label><input type="date" id="from"></div>
+      <div class="field" style="margin:0"><label>To</label><input type="date" id="to"></div>
+      <button class="btn ghost" id="btn-reset">Reset</button>
     </div>
-
-    <div class="group">
-      <h2>Warranty conditions</h2>
-      <div class="field"><textarea rows="4" id="warranty_text"></textarea></div>
+    <div class="chips">
+      <button class="chip on" data-preset="">All time</button>
+      <button class="chip" data-preset="today">Today</button>
+      <button class="chip" data-preset="week">Last 7 days</button>
+      <button class="chip" data-preset="month">This month</button>
     </div>
+  </div>
 
-    <div class="group">
-      <h2>Terms and conditions</h2>
-      <div class="field"><textarea rows="5" id="terms"></textarea></div>
+  <div class="results">
+    <div class="rhead">
+      <span id="rcount">Loading\u2026</span>
+      <span id="rsum"></span>
     </div>
-  </aside>
-
-  <main class="stage">
-    <div class="paper" id="paper"></div>
-  </main>
+    <table class="rt">
+      <thead>
+        <tr>
+          <th>Invoice</th>
+          <th>Customer</th>
+          <th>NIC</th>
+          <th>IMEI / serial</th>
+          <th>Email</th>
+          <th class="r">Date</th>
+          <th class="r">Total</th>
+          <th class="r">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="nores" id="nores" style="display:none">No invoices match that search.</div>
+  </div>
 </div>
 
-<!-- On a phone the toolbar buttons are hidden and these take over, fixed
-     within thumb reach. They drive the same handlers as the desktop ones. -->
-<div class="m-bar">
-  <button class="btn ghost narrow" id="m-clear" aria-label="Clear the form">Clear</button>
-  <button class="btn ghost" id="m-preview">Preview</button>
-  <button class="btn ghost narrow" id="m-print" aria-label="Print">Print</button>
-  <button class="btn" id="m-save">Save</button>
+<!-- full invoice viewer -->
+<div class="viewer" id="viewer">
+  <div class="vwrap">
+    <div class="vbar">
+      <span class="t" id="vtitle"></span>
+      <!-- a class, not an inline style, so the phone rules can wrap it -->
+      <span class="vacts">
+        <button class="btn ghost sm" id="v-close">Close</button>
+        <button class="btn ghost sm" id="v-edit">Edit</button>
+        <button class="btn ghost sm" id="v-email">Send email</button>
+        <button class="btn ghost sm" id="v-pdf">Download PDF</button>
+        <button class="btn sm" id="v-print">Print</button>
+      </span>
+    </div>
+    <div class="paper" id="vpaper"></div>
+  </div>
 </div>
 
 <script src="core.js"></script>
@@ -123,428 +102,237 @@
 (function () {
   "use strict";
   const $ = (id) => document.getElementById(id);
+  let timer = null;
 
-  let settings = {};
-  /* Overwritten from settings once they load, so a new item starts on
-     whichever warranty the shop sells most. */
-  let defaultWarrantyType = "apple_care";
-  const blankItem = () => ({ description: "", imei: "", pack_items: "",
-                             warranty_type: defaultWarrantyType, show_expiry: true, show_days: true,
-                             warranty_days: 0, qty: 1, unit_price: 0 });
-  let items = [blankItem()];
-  /* The cover options matter when the line has a warranty of its own, or
-     when its pack lists something with days after it ("Adaptor - 180"). */
-  const showOpts = (it) => it.warranty_type !== "none"
-    || /(?:\s[-\u2013\u2014]\s|\|)\s*\d{1,5}\s*(?:days?)?\s*$/im.test(it.pack_items || "");
-  const editId = new URLSearchParams(location.search).get("edit");
-  let savedNumber = null;
-  let savedId = null;
-  /* The address the server currently holds, so the Send button can tell
-     an unsaved edit from the stored recipient. */
-  let savedEmail = "";
-  let mailOn = false;
-
-  /* Three states: ready to send, sent, or failed. */
-  function showMail(r) {
-    const box = $("mailflag"), msg = $("mailmsg"), btn = $("btn-send");
-    if (!r || r.reason === "no_address") { box.classList.remove("show"); return; }
-
-    box.classList.add("show");
-
-    if (r.reason === "not_sent") {
-      box.classList.remove("bad");
-      msg.textContent = mailOn
-        ? "Ready to email " + ($("cust_email").value.trim() || "the customer")
-        : "Email sending is switched off on this server.";
-      btn.style.display = (mailOn && savedId) ? "inline-block" : "none";
-      btn.textContent = "Send email";
-      btn.disabled = false;
-      return;
-    }
-
-    if (r.sent) {
-      box.classList.remove("bad");
-      msg.textContent = "Invoice emailed to " + r.to;
-      btn.style.display = "none";
-    } else {
-      box.classList.add("bad");
-      msg.textContent = "The email did not send. " + (r.error || "");
-      btn.style.display = savedId ? "inline-block" : "none";
-      btn.textContent = "Try again";
-      btn.disabled = false;
-    }
-  }
-
-  /* ---------- read the form into a document object ---------- */
-  function collect() {
-    const mode = $("tax_mode").value;
-    const norm = items.map((it) => {
-      const qty = Number(it.qty) || 0;
-      const unit_price_c = I7.cents(it.unit_price);
-      return {
-        description: it.description,
-        imei: it.imei,
-        pack_items: it.pack_items || "",
-        warranty_type: it.warranty_type || "shop",
-        show_expiry: it.show_expiry !== false,
-        show_days: it.show_days !== false,
-        warranty_days: Math.max(0, parseInt(it.warranty_days, 10) || 0),
-        qty, unit_price_c,
-        amount_c: Math.round(qty * unit_price_c)
-      };
-    });
-
-    const doc = {
-      number: savedNumber || "\u2014 not saved \u2014",
-      issue_date: $("issue_date").value,
-      due_date: $("due_date").value,
-      currency: $("currency").value,
-      biz_name: settings.biz_name,
-      biz_lines: settings.biz_lines,
-      biz_address: settings.biz_address,
-      biz_phone: settings.biz_phone,
-      biz_email: settings.biz_email,
-      vat_no: $("vat_no").value,
-      tax_mode: mode,
-      vat_rate: mode === "none" ? 0 : Number($("vat_rate").value) || 0,
-      sscl_rate: mode === "vat_sscl" ? Number($("sscl_rate").value) || 0 : 0,
-      cust_name: $("cust_name").value,
-      cust_nic: $("cust_nic").value.toUpperCase(),
-      cust_phone: $("cust_phone").value,
-      cust_address: $("cust_address").value,
-      cust_email: $("cust_email").value.trim().toLowerCase(),
-      cashier: $("cashier").value,
-      discount_c: I7.cents($("discount").value),
-      warranty_text: $("warranty_text").value,
-      terms: $("terms").value,
-      items: norm.filter((it) => it.description.trim() || it.qty || it.unit_price_c)
-    };
-    doc.totals = I7.computeTotals(doc);
-    return doc;
-  }
-
-  /* ---------- render ---------- */
-  function renderItems() {
-    $("item-list").innerHTML = items.map((it, i) => {
-      const lt = Math.round((Number(it.qty) || 0) * I7.cents(it.unit_price));
-      return `<div class="item">
-        <div class="item-head">
-          <span class="item-no">${I7.pad(i + 1, 2)}</span>
-          <button class="kill" data-kill="${i}" aria-label="Remove item ${i + 1}">&times;</button>
-        </div>
-        <div class="field"><input data-f="description" data-i="${i}" placeholder="Item name" value="${I7.esc(it.description)}"></div>
-        <div class="field">
-          <label>What's in the pack <span class="opt">optional \u2014 one per line, no prices</span></label>
-          <textarea rows="3" data-f="pack_items" data-i="${i}" placeholder="JBL Speaker # SN12345 - 365&#10;Adaptor - 180&#10;Cable">${I7.esc(it.pack_items || "")}</textarea>
-          <p class="hint tight">Add <b># serial</b> and <b>- 180</b> after a line for that thing's serial and warranty days. Pack serials are searchable.</p>
-        </div>
-        <div class="field"><label>IMEI / serial</label><input class="code" data-f="imei" data-i="${i}" placeholder="Optional \u2014 searchable" value="${I7.esc(it.imei)}"></div>
-        <div class="row2">
-          <div class="field"><label>Qty</label><input class="num" type="number" min="0" step="1" data-f="qty" data-i="${i}" value="${I7.esc(it.qty)}"></div>
-          <div class="field"><label>Unit price</label><input class="num" type="number" min="0" step="0.01" data-f="unit_price" data-i="${i}" value="${I7.esc(it.unit_price)}"></div>
-        </div>
-        <div class="row2">
-          <div class="field"><label>Warranty type</label>
-            <select data-f="warranty_type" data-i="${i}">
-              <option value="shop"${it.warranty_type === "shop" ? " selected" : ""}>Limited Warranty</option>
-              <option value="apple_care"${it.warranty_type === "apple_care" ? " selected" : ""}>AppleCare Limited</option>
-              <option value="company"${it.warranty_type === "company" ? " selected" : ""}>Company warranty</option>
-              <option value="none"${it.warranty_type === "none" ? " selected" : ""}>No Warranty</option>
-            </select>
-          </div>
-          <div class="field"><label>Warranty days</label><input class="num" type="number" min="0" step="1" data-f="warranty_days" data-i="${i}" value="${I7.esc(it.warranty_days)}"${it.warranty_type === "none" ? " disabled" : ""}></div>
-        </div>
-        <div class="cover-opts" data-opts="${i}"${showOpts(it) ? "" : ' style="display:none"'}>
-          <label class="cbx-row tight">
-            <input type="checkbox" data-f="show_days" data-i="${i}"${it.show_days === false ? "" : " checked"}>
-            <span>Show number of days <span class="eg">(365 days)</span></span>
-          </label>
-          <label class="cbx-row tight">
-            <input type="checkbox" data-f="show_expiry" data-i="${i}"${it.show_expiry === false ? "" : " checked"}>
-            <span>Show expiry date <span class="eg">(valid to &hellip;)</span></span>
-          </label>
-        </div>
-        <div class="line-total">${I7.esc($("currency").value)} ${I7.money(lt)}</div>
-      </div>`;
-    }).join("");
-  }
-
-  function renderTaxUI() {
-    const mode = $("tax_mode").value;
-    $("vat-fields").style.display = mode === "none" ? "none" : "block";
-    $("sscl-field").style.display = mode === "vat_sscl" ? "block" : "none";
-    $("tax-note").innerHTML = I7.TAX_NOTES[mode];
-  }
-
-  function renderPaper() { $("paper").innerHTML = I7.renderPaper(collect()); }
-  function render() { renderItems(); renderTaxUI(); renderPaper(); }
-
-  /* ---------- events ---------- */
-  function onEdit(e) {
-    const el = e.target;
-    if (el.dataset && el.dataset.f !== undefined) {
-      const i = Number(el.dataset.i), f = el.dataset.f;
-      if (f === "show_expiry" || f === "show_days") {
-        items[i][f] = el.checked; renderPaper(); return;
-      }
-      items[i][f] = (f === "description" || f === "imei" || f === "warranty_type"
-                     || f === "pack_items")
-                   ? el.value : (el.value === "" ? 0 : Number(el.value));
-      if (f === "pack_items") {
-        const o = document.querySelector(`[data-opts="${i}"]`);
-        if (o) o.style.display = showOpts(items[i]) ? "" : "none";
-        renderPaper(); return;
-      }
-      if (f === "warranty_type") {
-        /* "No Warranty" carries no days, so clear the box and lock it. */
-        if (el.value === "none") items[i].warranty_days = 0;
-        renderItems();
-        renderPaper();
-        return;
-      }
-      const box = el.closest(".item");
-      if (box) {
-        const lt = Math.round((Number(items[i].qty) || 0) * I7.cents(items[i].unit_price));
-        box.querySelector(".line-total").textContent = $("currency").value + " " + I7.money(lt);
-      }
-      renderPaper();
-      return;
-    }
-    if (el.id === "tax_mode") renderTaxUI();
-    if (el.id === "currency") renderItems();
-    if (el.id === "issue_date") {
-      const pd = Number(settings.payment_days);
-      $("due_date").value = pd > 0 ? I7.addDays(el.value, pd) : "";
-    }
-    renderPaper();
-  }
-  document.addEventListener("input", onEdit);
-  document.addEventListener("change", onEdit);
-
-  /* Selecting the contents on focus means typing replaces the 0 instead
-     of producing 0440000. */
-  document.addEventListener("focusin", (e) => {
-    if (e.target.matches && e.target.matches("input.num")) e.target.select();
-  });
-
-  /* A field left empty falls back to 0 rather than staying blank. */
-  document.addEventListener("focusout", (e) => {
-    const el = e.target;
-    if (el.matches && el.matches("input.num") && el.value === "") {
-      el.value = 0;
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-  });
-
-  document.addEventListener("click", (e) => {
-    const k = e.target.closest("[data-kill]");
-    if (!k) return;
-    items.splice(Number(k.dataset.kill), 1);
-    if (!items.length) items.push(blankItem());
-    render();
-  });
-
-  $("btn-add").addEventListener("click", () => {
-    items.push(blankItem());
-    renderItems();
-    const boxes = $("item-list").querySelectorAll('input[data-f="description"]');
-    if (boxes.length) boxes[boxes.length - 1].focus();
-  });
-
-  $("btn-print").addEventListener("click", () => window.print());
-
-  $("btn-pdf").addEventListener("click", () => {
-    if (savedId) window.open("/api/invoices/" + savedId + "/pdf", "_blank");
-  });
-
-  $("btn-send").addEventListener("click", async () => {
-    if (!savedId) return;
-    /* The server emails whatever address is stored, so a freshly typed
-       one that has not been saved would send to the old recipient. */
-    if ($("cust_email").value.trim().toLowerCase() !== savedEmail) {
-      showErr("The email address has changed. Press " +
-              ($("btn-save").textContent.trim() || "Save") +
-              " first, then send.");
-      return;
-    }
-    showErr("");
-    const btn = $("btn-send");
-    btn.disabled = true;
-    btn.textContent = "Sending\u2026";
+  /* ---------------- stats ---------------- */
+  async function loadStats() {
     try {
-      showMail(await I7.api("/api/invoices/" + savedId + "/email", { method: "POST" }));
+      const s = await I7.api("/api/stats");
+      const c = s.currency || "LKR";
+      $("stats").innerHTML = `
+        <div class="stat hero">
+          <div class="k">Sales this month</div>
+          <div class="v">${c} ${I7.money(s.month_total_c)}</div>
+        </div>
+        <div class="stat">
+          <div class="k">Invoices this month</div>
+          <div class="v">${s.month_count} <small>/ ${s.today_count} today</small></div>
+        </div>
+        <div class="stat">
+          <div class="k">VAT this month</div>
+          <div class="v">${c} ${I7.money(s.month_vat_c)}</div>
+        </div>
+        <div class="stat">
+          <div class="k">SSCL this month</div>
+          <div class="v">${c} ${I7.money(s.month_sscl_c)}</div>
+        </div>
+        <div class="stat">
+          <div class="k">Warranties in force</div>
+          <div class="v">${s.active_warranties} <small>items</small></div>
+        </div>
+        <div class="stat">
+          <div class="k">Invoices on record</div>
+          <div class="v">${s.all_count}</div>
+        </div>`;
     } catch (e) {
-      showMail({ sent: false, error: e.message });
+      $("stats").innerHTML = `<div class="stat"><div class="k">Stats</div><div class="v"><small>${I7.esc(e.message)}</small></div></div>`;
     }
-  });
-
-  function showErr(msg) {
-    const e = $("err");
-    if (!msg) { e.classList.remove("show"); return; }
-    e.textContent = msg; e.classList.add("show");
-    e.scrollIntoView({ block: "nearest" });
   }
 
-  $("btn-save").addEventListener("click", async () => {
-    showErr("");
-    const d = collect();
-    if (!d.cust_name.trim()) return showErr("Enter the customer name before saving.");
-    if (!d.items.length)     return showErr("Add at least one item before saving.");
-
-    const payload = {
-      issue_date: d.issue_date, due_date: d.due_date, currency: d.currency,
-      cust_name: d.cust_name, cust_nic: d.cust_nic,
-      cust_phone: d.cust_phone, cust_address: d.cust_address,
-      cust_email: d.cust_email,
-      tax_mode: d.tax_mode, vat_rate: d.vat_rate, sscl_rate: d.sscl_rate, vat_no: d.vat_no,
-      discount: Number($("discount").value) || 0,
-      warranty_text: d.warranty_text, terms: d.terms, cashier: d.cashier,
-      items: items.map((it) => ({
-        description: it.description, imei: it.imei,
-        pack_items: it.pack_items || "",
-        warranty_type: it.warranty_type || "shop",
-        show_expiry: it.show_expiry !== false,
-        show_days: it.show_days !== false,
-        warranty_days: it.warranty_days, qty: it.qty, unit_price: it.unit_price
-      }))
-    };
-
-    $("btn-save").disabled = true;
-    try {
-      const out = editId
-        ? await I7.api("/api/invoices/" + editId, { method: "PUT", body: JSON.stringify(payload) })
-        : await I7.api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
-      savedNumber = out.number;
-      savedId = out.id;
-      savedEmail = $("cust_email").value.trim().toLowerCase();
-      $("saved-no").textContent = out.number;
-      $("saved").classList.add("show");
-      $("btn-save").textContent = editId ? "Changes saved" : "Saved";
-      $("btn-pdf").style.display = "inline-block";
-      showMail(out.email);
-      renderPaper();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (err) {
-      showErr(err.message);
-      $("btn-save").disabled = false;
-    }
-  });
-
-  $("btn-clear").addEventListener("click", () => {
-    if (savedNumber && !confirm("Start a new blank invoice?")) return;
-    location.reload();
-  });
-
-  /* ---------- phone action bar ----------
-     The form and the preview cannot both fit on a phone, so the bar
-     swaps between them and relays the other taps to the toolbar
-     buttons, which keeps one copy of every handler. */
-  const relay = (from, to) =>
-    $(from).addEventListener("click", () => $(to).click());
-  relay("m-clear", "btn-clear");
-  relay("m-print", "btn-print");
-  relay("m-save",  "btn-save");
-
-  $("m-preview").addEventListener("click", () => {
-    const showing = document.body.classList.toggle("show-preview");
-    $("m-preview").textContent = showing ? "Edit" : "Preview";
-    if (showing) renderPaper();
-    window.scrollTo({ top: 0 });
-  });
-
-  /* The phone bar mirrors the toolbar's Save button, shortened to fit.
-     The toolbar button stays disabled after a successful save so the
-     invoice cannot be written twice, so "saved" is read from the label
-     rather than from the disabled flag. */
-  const mirrorSave = () => {
-    const src = $("btn-save"), dst = $("m-save");
-    const label = src.textContent.trim();
-    const done = /saved/i.test(label);
-    dst.textContent = done ? "Saved" : (src.disabled ? "Saving…" : "Save");
-    dst.disabled = src.disabled;
-  };
-  new MutationObserver(mirrorSave).observe($("btn-save"),
-    { childList: true, characterData: true, subtree: true, attributes: true });
-
-  /* ---------- boot ---------- */
-  (async function init() {
-    try { settings = await I7.api("/api/settings"); }
-    catch { settings = {}; }
-
-    try {
-      const sess = await fetch("/api/session").then((r) => r.json());
-      mailOn = Boolean(sess.mail);
-      if (sess.role === "cashier") document.querySelector('a[href="dashboard.html"]').style.display = "none";
-    } catch { /* stay usable offline */ }
-    $("mail-on").textContent = mailOn ? "\u00b7 send after saving" : "\u00b7 sending is off";
-
-    const today = I7.isoToday();
-    $("issue_date").value = today;
-    const payDays = settings.payment_days === undefined ? 14 : Number(settings.payment_days);
-    $("due_date").value = payDays > 0 ? I7.addDays(today, payDays) : "";
-    $("currency").value = settings.currency || "LKR";
-    $("vat_rate").value = settings.vat_rate || 18;
-    $("sscl_rate").value = settings.sscl_rate || 2.5;
-    $("vat_no").value = settings.vat_no || "";
-    $("tax_mode").value = settings.tax_mode || "none";
-    defaultWarrantyType = settings.warranty_type_default || "apple_care";
-    /* the first row was built before settings arrived */
-    items.forEach((it) => {
-      if (!it.description && !it.imei && !it.warranty_days && !it.unit_price) {
-        it.warranty_type = defaultWarrantyType;
-      }
+  /* ---------------- search ---------------- */
+  async function search() {
+    const p = new URLSearchParams({
+      q: $("q").value.trim(),
+      field: $("field").value
     });
-    $("warranty_text").value = settings.warranty_text || "";
-    $("terms").value = settings.terms || "";
-    if (editId) {
+    if ($("from").value) p.set("from", $("from").value);
+    if ($("to").value)   p.set("to", $("to").value);
+
+    try {
+      const rows = await I7.api("/api/invoices?" + p.toString());
+      const total = rows.reduce((a, r) => a + r.total_c, 0);
+      const today = document.body.dataset.role === "cashier" ? " today" : "";
+      $("rcount").textContent = rows.length
+        ? `${rows.length} invoice${rows.length === 1 ? "" : "s"}${today}`
+        : (today ? "No invoices yet today" : "No results");
+      /* The takings sum is removed from the page for cashiers, so it may
+         not exist; writing to it unguarded crashed the whole search. */
+      const rsum = $("rsum");
+      if (rsum) rsum.textContent = rows.length ? `Total ${rows[0].currency || "LKR"} ${I7.money(total)}` : "";
+      $("nores").style.display = rows.length ? "none" : "block";
+
+      $("rows").innerHTML = rows.map((r) => {
+        const modeTag = { none: "No VAT", vat: "VAT", vat_sscl: "VAT+SSCL", incl: "VAT incl." }[r.tax_mode] || "";
+        return `<tr data-id="${r.id}">
+          <td class="num">${I7.esc(r.number)}<span class="sub">${r.item_count} item${r.item_count === 1 ? "" : "s"}</span></td>
+          <td>${I7.esc(r.cust_name)}${r.cust_phone ? `<span class="sub">${I7.esc(r.cust_phone)}</span>` : ""}</td>
+          <td class="mono">${r.cust_nic ? I7.esc(r.cust_nic) : "<span style='opacity:.35'>\u2014</span>"}</td>
+          <td class="mono" style="font-size:11px">${r.imeis ? I7.esc(r.imeis) : "<span style='opacity:.35'>\u2014</span>"}</td>
+          <td style="font-size:11px">${r.cust_email ? I7.esc(r.cust_email) : "<span style='opacity:.35'>\u2014</span>"}${epill(r.email_status)}</td>
+          <td class="r mono">${I7.niceDate(r.issue_date)}<span class="sub"><span class="tag">${modeTag}</span></span></td>
+          ${document.body.dataset.role === "cashier" ? "" : `<td class="r mono" style="font-weight:700">${I7.money(r.total_c)}</td>`}
+          <td class="r acts">
+             <button class="mini" data-edit="${r.id}">Edit</button>
+             ${document.body.dataset.role === "cashier" ? "" :
+               `<button class="mini del" data-del="${r.id}" data-no="${I7.esc(r.number)}">Delete</button>`}
+           </td>
+        </tr>`;
+      }).join("");
+    } catch (e) {
+      $("rcount").textContent = e.message;
+      $("rows").innerHTML = "";
+    }
+  }
+
+  function debounced() { clearTimeout(timer); timer = setTimeout(search, 180); }
+
+  ["q"].forEach((id) => $(id).addEventListener("input", debounced));
+  ["field", "from", "to"].forEach((id) => $(id).addEventListener("change", search));
+
+  $("btn-reset").addEventListener("click", () => {
+    $("q").value = ""; $("field").value = "all"; $("from").value = ""; $("to").value = "";
+    document.querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.preset === ""));
+    search(); $("q").focus();
+  });
+
+  document.querySelectorAll(".chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll(".chip").forEach((c) => c.classList.remove("on"));
+      chip.classList.add("on");
+      const t = I7.isoToday();
+      const p = chip.dataset.preset;
+      if (p === "today")      { $("from").value = t; $("to").value = t; }
+      else if (p === "week")  { $("from").value = I7.addDays(t, -6); $("to").value = t; }
+      else if (p === "month") { $("from").value = t.slice(0, 7) + "-01"; $("to").value = t; }
+      else                    { $("from").value = ""; $("to").value = ""; }
+      search();
+    });
+  });
+
+  /* ---------------- viewer ---------------- */
+  async function openInvoice(id) {
+    try {
+      const inv = await I7.api("/api/invoices/" + id);
+      inv.totals = {
+        subtotal_c: inv.subtotal_c, discount_c: inv.discount_c, net_c: inv.net_c,
+        sscl_c: inv.sscl_c, taxable_c: inv.taxable_c, vat_c: inv.vat_c,
+        incl_vat_c: inv.incl_vat_c, total_c: inv.total_c
+      };
+      $("vpaper").innerHTML = I7.renderPaper(inv);
+      viewingId = inv.id;
+      $("v-email").style.display = inv.cust_email ? "inline-block" : "none";
+      $("v-email").disabled = false;
+      $("v-email").textContent = "Send email";
+      $("vtitle").textContent = inv.number + " \u00b7 " + inv.cust_name;
+      $("viewer").classList.add("show");
+      document.body.style.overflow = "hidden";
+    } catch (e) { alert(e.message); }
+  }
+
+  function closeViewer() {
+    $("viewer").classList.remove("show");
+    document.body.style.overflow = "";
+  }
+
+  let viewingId = null;
+
+  $("rows").addEventListener("click", async (e) => {
+    const ed = e.target.closest("[data-edit]");
+    if (ed) { location.href = "/?edit=" + ed.dataset.edit; return; }
+
+    const del = e.target.closest("[data-del]");
+    if (del) {
+      const no = del.dataset.no;
+      if (!confirm(`Delete invoice ${no}?\n\nThis removes it and its items permanently. The number ${no} will not be reused, so your sequence will show a gap.`)) return;
       try {
-        const inv = await I7.api("/api/invoices/" + editId);
-        savedNumber = inv.number; savedId = inv.id;
-        savedEmail = (inv.cust_email || "").trim().toLowerCase();
-        $("btn-pdf").style.display = "inline-block";
-        $("cust_name").value = inv.cust_name || "";
-        $("cust_nic").value = inv.cust_nic || "";
-        $("cust_phone").value = inv.cust_phone || "";
-        $("cust_email").value = inv.cust_email || "";
-        $("cust_address").value = inv.cust_address || "";
-        $("issue_date").value = inv.issue_date || today;
-        $("due_date").value = inv.due_date || "";
-        $("currency").value = inv.currency || "LKR";
-        $("cashier").value = inv.cashier || "";
-        $("tax_mode").value = inv.tax_mode || "none";
-        $("vat_rate").value = inv.vat_rate || 0;
-        $("sscl_rate").value = inv.sscl_rate || 0;
-        $("vat_no").value = inv.vat_no || "";
-        $("discount").value = (inv.discount_c || 0) / 100;
-        $("warranty_text").value = inv.warranty_text || "";
-        $("terms").value = inv.terms || "";
-        items = (inv.items || []).map((it) => ({
-          description: it.description, imei: it.imei || "",
-          pack_items: it.pack_items || "",
-          warranty_type: it.warranty_type || "shop",
-          show_expiry: it.show_expiry !== false && it.show_expiry !== 0,
-          show_days: it.show_days !== false && it.show_days !== 0,
-          warranty_days: it.warranty_days || 0,
-          qty: it.qty, unit_price: (it.unit_price_c || 0) / 100
-        }));
-        if (!items.length) items.push(blankItem());
-        document.querySelector(".topbar h1, .navlinks a.on").textContent = "Editing " + inv.number;
-        $("btn-save").textContent = "Save changes";
-        $("edit-note").classList.add("show");
-        $("edit-no").textContent = inv.number;
-        /* An invoice opened for editing is already saved, so if it has
-           an address the Send button belongs on screen straight away
-           rather than only after another save. */
-        showMail(inv.cust_email
-          ? (inv.email_status === "sent"
-              ? { sent: true, to: inv.cust_email }
-              : { sent: false, reason: "not_sent" })
-          : null);
-      } catch (e) { showErr("Could not load that invoice: " + e.message); }
+        await I7.api("/api/invoices/" + del.dataset.del, { method: "DELETE" });
+        loadStats(); search();
+      } catch (err) { alert(err.message); }
+      return;
     }
 
-    render();
-    $("cust_name").focus();
+    const tr = e.target.closest("tr[data-id]");
+    if (tr) openInvoice(tr.dataset.id);
+  });
+
+  $("v-edit").addEventListener("click", () => {
+    if (viewingId) location.href = "/?edit=" + viewingId;
+  });
+
+  $("v-pdf").addEventListener("click", () => {
+    if (viewingId) window.open("/api/invoices/" + viewingId + "/pdf", "_blank");
+  });
+
+  $("v-email").addEventListener("click", async () => {
+    if (!viewingId) return;
+    const btn = $("v-email");
+    btn.disabled = true; btn.textContent = "Sending\u2026";
+    try {
+      const r = await I7.api("/api/invoices/" + viewingId + "/email", { method: "POST" });
+      btn.textContent = r.sent ? "Sent to " + r.to : "Failed";
+      if (!r.sent) alert(r.error || "The email did not send.");
+      search();
+    } catch (e) {
+      btn.textContent = "Failed"; alert(e.message);
+    }
+    setTimeout(() => { btn.disabled = false; btn.textContent = "Send email"; }, 2500);
+  });
+  $("v-close").addEventListener("click", closeViewer);
+  $("v-print").addEventListener("click", () => window.print());
+  $("viewer").addEventListener("click", (e) => { if (e.target === $("viewer")) closeViewer(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && $("viewer").classList.contains("show")) closeViewer();
+    if (e.key === "/" && document.activeElement !== $("q")) { e.preventDefault(); $("q").focus(); }
+  });
+
+  function epill(st) {
+    if (!st || st === "not_sent") return "";
+    const map = { sent: ["sent", "Sent"], failed: ["failed", "Failed"],
+                  bad_address: ["failed", "Bad address"], no_address: ["", "No address"],
+                  disabled: ["", "Sending off"] };
+    const m = map[st] || ["", st];
+    return `<span class="epill ${m[0]}">${m[1]}</span>`;
+  }
+
+  $("btn-logout").addEventListener("click", async () => {
+    await fetch("/api/logout").catch(() => {});
+    location.href = "/login.html";
+  });
+
+  (async function boot() {
+    let sess = { role: "admin", required: false };
+    try { sess = await fetch("/api/session").then((r) => r.json()); } catch {}
+
+    if (sess.required && !sess.authed) {
+      location.href = "/login.html?next=" + encodeURIComponent(location.pathname);
+      return;
+    }
+
+    const tag = $("role-tag");
+    if (sess.required) {
+      tag.style.display = "inline-block";
+      tag.textContent = sess.role;
+      tag.classList.toggle("cashier", sess.role === "cashier");
+    }
+
+    /* Cashiers may look up warranties but see no money figures. */
+    if (sess.role === "cashier") {
+      $("stats").remove();
+      $("rsum").remove();
+      document.querySelectorAll("table.rt th").forEach((th) => {
+        if (th.textContent.trim() === "Total") th.remove();
+      });
+      document.body.dataset.role = "cashier";
+      /* The server only returns today's invoices to a cashier, so the date
+         filters would do nothing. Hidden, not removed: search() reads them. */
+      document.querySelector(".chips").style.display = "none";
+      $("from").closest(".field").style.display = "none";
+      $("to").closest(".field").style.display = "none";
+      $("q").placeholder = "Search today's invoices \u2014 NIC, IMEI, number, name\u2026";
+    } else {
+      loadStats();
+    }
+    search();
   })();
 })();
 </script>

@@ -192,6 +192,8 @@
       if (it.show_expiry === true  || it.show_expiry === 1) return true;
       return d.show_warranty_expiry !== false && d.show_warranty_expiry !== 0;
     };
+    /* Whether "365 days" is printed; older invoices keep showing it. */
+    const lineShowsDays = (it) => !(it.show_days === false || it.show_days === 0);
     const items = (d.items || []);
 
     /* --- head band: VAT number only appears when a tax type is selected --- */
@@ -238,13 +240,17 @@
               const sn = pi.serial ? ` <span class="psn">${esc(serialLabel(pi.serial))}</span>` : "";
               if (!pi.days) return `<span>${esc(pi.name)}${sn}</span>`;
               const pUntil = addDays(d.issue_date, pi.days);
-              const pExp = lineShowsExpiry(it) && pUntil ? ` \u00b7 valid to ${niceDate(pUntil)}` : "";
-              return `<span>${esc(pi.name)}${sn} <b class="pw">${pi.days} days warranty</b>${pExp}</span>`;
+              const sd = lineShowsDays(it), se = lineShowsExpiry(it) && pUntil;
+              const cover = sd && se ? `<b class="pw">${pi.days} days warranty</b> \u00b7 valid to ${niceDate(pUntil)}`
+                          : sd       ? `<b class="pw">${pi.days} days warranty</b>`
+                          : se       ? `<b class="pw">warranty</b> valid to ${niceDate(pUntil)}`
+                          :            `<b class="pw">with warranty</b>`;
+              return `<span>${esc(pi.name)}${sn} ${cover}</span>`;
             }).join("")}</span>`
           : "";
         /* "No Warranty" prints nothing at all. */
         const w = (days > 0 && it.warranty_type !== "none")
-          ? `<span class="wtag ${esc(it.warranty_type || "shop")}">${esc(warrantyLabel(it.warranty_type))} <b>${days}</b> days${lineShowsExpiry(it) ? ` \u00b7 valid to ${niceDate(until)}` : ""}</span>`
+          ? `<span class="wtag ${esc(it.warranty_type || "shop")}">${esc(warrantyLabel(it.warranty_type))}${lineShowsDays(it) ? ` <b>${days}</b> days` : ""}${lineShowsExpiry(it) ? ` \u00b7 valid to ${niceDate(until)}` : ""}</span>`
           : "";
         return `<tr>
           <td class="idx">${pad(i + 1, 2)}</td>

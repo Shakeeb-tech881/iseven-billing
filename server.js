@@ -89,6 +89,14 @@ const server = http.createServer(async (req, res) => {
           required: auth.authEnabled(), mail: require("./lib/mailer.js").mailEnabled()
         });
 
+      /* Brevo reports delivery here. No session: it is a server calling
+         in, so it is checked by the key in the URL instead. */
+      if (p === "/api/hooks/brevo" && req.method === "POST") {
+        if (!auth.webhookKeyOk(url.searchParams.get("key")))
+          return json(res, 401, { error: "Bad webhook key." });
+        return json(res, 200, await billing.brevoWebhook(body || {}));
+      }
+
       if (!auth.isAuthed(req)) return json(res, 401, { error: "Not signed in." });
       if (auth.requiresAdmin(req.method, p) && !auth.isAdmin(req))
         return json(res, 403, { error: "Admin access only." });

@@ -47,6 +47,14 @@ module.exports = async (req, res) => {
       });
     }
 
+    /* Brevo reports delivery here. No session: it is a server calling
+       in, so it is checked by the key in the URL instead. */
+    if (p === "/api/hooks/brevo" && req.method === "POST") {
+      if (!auth.webhookKeyOk(url.searchParams.get("key")))
+        return send(res, 401, { error: "Bad webhook key." });
+      return send(res, 200, await billing.brevoWebhook(body || {}));
+    }
+
     if (!auth.isAuthed(req)) return send(res, 401, { error: "Not signed in." });
     if (auth.requiresAdmin(req.method, p) && !auth.isAdmin(req))
       return send(res, 403, { error: "Admin access only." });

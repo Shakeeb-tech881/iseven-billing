@@ -46,7 +46,8 @@
       <div class="field"><label>Name <b style="color:var(--lime)">*</b></label><input id="cust_name" placeholder="Full name"></div>
       <div class="field"><label>NIC number</label><input class="code" id="cust_nic" placeholder="200012345678 or 901234567V"></div>
       <div class="field"><label>Phone</label><input class="code" id="cust_phone" placeholder="+94 77 000 0000"></div>
-      <div class="field"><label>Email <span id="mail-on" style="color:var(--lime)">· invoice sent here automatically</span></label><input type="email" id="cust_email" placeholder="customer@example.com"></div>
+      <div class="field"><label>Email <span id="mail-on" style="color:var(--lime)">· invoice sent here automatically</span></label><input type="email" id="cust_email" placeholder="customer@example.com">
+        <div class="mail-warn" id="mail-warn"></div></div>
       <div class="field"><label>Address</label><textarea rows="2" id="cust_address"></textarea></div>
       <p class="hint">NIC is how you look this customer up later. It is stored and printed on the invoice. Nothing is emailed until you press <b>Send email</b> after saving.</p>
     </div>
@@ -143,6 +144,33 @@
      an unsaved edit from the stored recipient. */
   let savedEmail = "";
   let mailOn = false;
+
+  /* A mistyped address looks exactly like a success, because the bounce
+     comes back to Brevo long after the customer has left. So the obvious
+     slips are caught here, at the counter, while they can still be asked. */
+  let lastWarn = null;
+  function checkEmail() {
+    const box = $("mail-warn"), r = I7.emailProblem($("cust_email").value);
+    const html = !r ? "" : I7.esc(r.problem) + (r.suggestion
+      ? ` Did you mean <button type="button" class="fixmail"
+           data-fix="${I7.esc(r.suggestion)}">${I7.esc(r.suggestion)}</button>?`
+      : "");
+    /* Only touch the DOM when the message actually changes. Rebuilding it
+       on every keystroke tore out the button the cashier was clicking:
+       the click blurs the field, blur re-rendered the box, and the button
+       vanished between press and release, so the click never landed. */
+    if (html === lastWarn) return;
+    lastWarn = html;
+    box.innerHTML = html;
+    box.classList.toggle("show", Boolean(html));
+  }
+  /* Bound once to the box, which survives its contents being replaced. */
+  $("mail-warn").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-fix]");
+    if (!b) return;
+    $("cust_email").value = b.dataset.fix;
+    checkEmail(); renderPaper();
+  });
 
   /* Three states: ready to send, sent, or failed. */
   function showMail(r) {
@@ -320,6 +348,8 @@
   }
   document.addEventListener("input", onEdit);
   document.addEventListener("change", onEdit);
+  $("cust_email").addEventListener("input", checkEmail);
+  $("cust_email").addEventListener("blur", checkEmail);
 
   /* Selecting the contents on focus means typing replaces the 0 instead
      of producing 0440000. */
@@ -367,6 +397,13 @@
               " first, then send.");
       return;
     }
+    /* Read the address back before it goes. One glance here saves a
+       bounce nobody would notice until the customer complains. */
+    const to = $("cust_email").value.trim();
+    const warn = I7.emailProblem(to);
+    if (!confirm(`Send invoice ${savedNumber} to:\n\n${to}\n\n`
+                 + (warn ? warn.problem + "\n\n" : "")
+                 + "Is that address correct?")) return;
     showErr("");
     const btn = $("btn-send");
     btn.disabled = true;

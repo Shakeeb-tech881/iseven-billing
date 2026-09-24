@@ -287,7 +287,14 @@
 
   function epill(st) {
     if (!st || st === "not_sent") return "";
-    const map = { sent: ["sent", "Sent"], failed: ["failed", "Failed"],
+    /* "Sent" only means Brevo took the message. The rest come back from
+       Brevo's webhook once it knows what really happened. */
+    const map = { sent: ["sent", "Sent"], delivered: ["ok", "Delivered"],
+                  bounced: ["failed", "Bounced \u2014 wrong address"],
+                  blocked: ["failed", "Blocked"], spam: ["warn", "Marked spam"],
+                  soft_bounce: ["warn", "Not yet delivered"],
+                  unsubscribed: ["warn", "Unsubscribed"],
+                  failed: ["failed", "Failed"],
                   bad_address: ["failed", "Bad address"], no_address: ["", "No address"],
                   disabled: ["", "Sending off"] };
     const m = map[st] || ["", st];

@@ -123,6 +123,38 @@
      The dash must have spaces around it, so model numbers survive intact:
      "USB-3", "Charger 20W-2" and a serial like "ABC-123" are never read
      as a warranty. */
+  /* Addresses typed at a busy counter. These are the domains people
+     actually mistype; the check only suggests, it never rewrites. */
+  const DOMAIN_TYPOS = {
+    "gmail.con": "gmail.com", "gmail.co": "gmail.com", "gmail.cm": "gmail.com",
+    "gmial.com": "gmail.com", "gmai.com": "gmail.com", "gmail.om": "gmail.com",
+    "gmaill.com": "gmail.com", "gmail.comm": "gmail.com", "gamil.com": "gmail.com",
+    "gnail.com": "gmail.com", "gmail.cok": "gmail.com", "gmail.xom": "gmail.com",
+    "yahoo.con": "yahoo.com", "yaho.com": "yahoo.com", "yahooo.com": "yahoo.com",
+    "yahoo.co": "yahoo.com", "yhoo.com": "yahoo.com",
+    "hotmail.con": "hotmail.com", "hotmial.com": "hotmail.com",
+    "hotmai.com": "hotmail.com", "hotmail.co": "hotmail.com",
+    "outlook.con": "outlook.com", "outlok.com": "outlook.com",
+    "iclould.com": "icloud.com", "icloud.con": "icloud.com", "iclod.com": "icloud.com"
+  };
+
+  /* null when it looks fine. Otherwise { problem, suggestion }. */
+  function emailProblem(addr) {
+    const v = String(addr || "").trim();
+    if (!v) return null;
+    if (/\s/.test(v)) return { problem: "There is a space in the address." };
+    if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(v))
+      return { problem: "That does not look like a complete email address." };
+    const [user, domain] = v.split("@");
+    const fixed = DOMAIN_TYPOS[domain.toLowerCase()];
+    if (fixed) return { problem: "Check the part after the @.",
+                        suggestion: user + "@" + fixed };
+    if (/\.(con|cmo|cm|ocm|vom|xom)$/i.test(domain))
+      return { problem: "Check the ending of the address.",
+               suggestion: user + "@" + domain.replace(/\.[a-z]+$/i, ".com") };
+    return null;
+  }
+
   function parsePackLine(raw) {
     let line = String(raw == null ? "" : raw).trim();
     let days = 0;
@@ -346,5 +378,5 @@
 
   global.I7 = { cents, money, esc, pad, isoToday, addDays, niceDate,
                 computeTotals, TAX_NOTES, renderPaper, api,
-                WARRANTY_TYPES, warrantyLabel, warrantyShort };
+                WARRANTY_TYPES, warrantyLabel, warrantyShort, emailProblem };
 })(window);

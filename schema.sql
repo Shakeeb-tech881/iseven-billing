@@ -135,6 +135,10 @@ ALTER TABLE invoices ADD COLUMN IF NOT EXISTS email_status  text NOT NULL DEFAUL
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS email_sent_at timestamptz;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS email_error   text;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS email_attempts int NOT NULL DEFAULT 0;
+-- Delivery result reported back by Brevo's webhook.
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS email_message_id  text;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS email_delivered_at timestamptz;
+CREATE INDEX IF NOT EXISTS idx_inv_emsgid ON invoices (email_message_id);
 
 CREATE INDEX IF NOT EXISTS idx_inv_email  ON invoices (lower(cust_email));
 CREATE INDEX IF NOT EXISTS idx_inv_estat  ON invoices (email_status);

@@ -172,6 +172,21 @@
     return null;
   }
 
+  /* wa.me wants digits only with a country code. Sri Lankan numbers are
+     typed as 0771234567; anything already written with + is left alone. */
+  function waNumber(phone) {
+    let v = String(phone || "").trim();
+    if (!v) return "";
+    const intl = v.startsWith("+");
+    v = v.replace(/\D/g, "");
+    if (!v) return "";
+    if (intl) return v;
+    if (v.startsWith("94")) return v;
+    if (v.startsWith("0")) return "94" + v.slice(1);
+    if (v.length === 9) return "94" + v;
+    return v;
+  }
+
   function parsePackLine(raw) {
     let line = String(raw == null ? "" : raw).trim();
     let days = 0;
@@ -396,5 +411,5 @@
   global.I7 = { cents, money, esc, pad, isoToday, addDays, niceDate,
                 computeTotals, TAX_NOTES, renderPaper, api,
                 WARRANTY_TYPES, warrantyLabel, warrantyShort, emailProblem,
-                niceDateTime };
+                niceDateTime, waNumber };
 })(window);

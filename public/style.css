@@ -655,3 +655,9 @@ input[type=number]::-webkit-inner-spin-button{
 
 .loadwrap{padding:12px 15px;text-align:center}
 .loadwrap:has(#loadmore[style*="none"]){padding:0}
+
+/* ---- given by hand ---- */
+.echip.handed b{color:#9fe8b4}
+.echip.nothing b{color:#f3dfa8}
+.mini.wa{border-color:#2f8f63;color:#7fe3ae}
+.mini.wa:hover{background:#2f8f63;color:#061a10}

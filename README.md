@@ -1,4 +1,4 @@
-# I7SEVEN MOBILES — Billing system
+# I7SEVEN MOBILES — Billing system automated
 
 Invoicing with a database, a dashboard, and lookup by NIC or IMEI.
 No npm packages, no build step, no paid services.

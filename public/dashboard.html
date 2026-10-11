@@ -60,6 +60,9 @@
       <span id="rcount">Loading\u2026</span>
       <span id="rsum"></span>
     </div>
+    <!-- Who has actually received their invoice. Counts are for the
+         invoices listed below, and each one filters the list. -->
+    <div class="estrip" id="estrip"></div>
     <table class="rt">
       <thead>
         <tr>
@@ -149,7 +152,13 @@
     if ($("to").value)   p.set("to", $("to").value);
 
     try {
-      const rows = await I7.api("/api/invoices?" + p.toString());
+      const all = await I7.api("/api/invoices?" + p.toString());
+      lastRows = all;
+      renderStrip(all);
+      const g = EGROUPS.find(([k]) => k === efilter);
+      const rows = efilter === "all" ? all
+                 : efilter === "noaddr" ? all.filter((r) => !r.cust_email)
+                 : all.filter((r) => r.cust_email && g[2](r));
       const total = rows.reduce((a, r) => a + r.total_c, 0);
       const today = document.body.dataset.role === "cashier" ? " today" : "";
       $("rcount").textContent = rows.length
@@ -161,6 +170,15 @@
       if (rsum) rsum.textContent = rows.length ? `Total ${rows[0].currency || "LKR"} ${I7.money(total)}` : "";
       $("nores").style.display = rows.length ? "none" : "block";
 
+      paint(rows);
+    } catch (e) {
+      $("rcount").textContent = e.message;
+      $("rows").innerHTML = "";
+    }
+  }
+
+  function paint(rows) {
+      $("nores").style.display = rows.length ? "none" : "block";
       $("rows").innerHTML = rows.map((r) => {
         const modeTag = { none: "No VAT", vat: "VAT", vat_sscl: "VAT+SSCL", incl: "VAT incl." }[r.tax_mode] || "";
         return `<tr data-id="${r.id}">
@@ -168,21 +186,39 @@
           <td>${I7.esc(r.cust_name)}${r.cust_phone ? `<span class="sub">${I7.esc(r.cust_phone)}</span>` : ""}</td>
           <td class="mono">${r.cust_nic ? I7.esc(r.cust_nic) : "<span style='opacity:.35'>\u2014</span>"}</td>
           <td class="mono" style="font-size:11px">${r.imeis ? I7.esc(r.imeis) : "<span style='opacity:.35'>\u2014</span>"}</td>
-          <td style="font-size:11px">${r.cust_email ? I7.esc(r.cust_email) : "<span style='opacity:.35'>\u2014</span>"}${epill(r.email_status)}</td>
+          <td style="font-size:11px">${r.cust_email ? I7.esc(r.cust_email) : "<span style='opacity:.35'>\u2014</span>"}${epill(r.email_status, r.email_error)}${estamp(r)}</td>
           <td class="r mono">${I7.niceDate(r.issue_date)}<span class="sub"><span class="tag">${modeTag}</span></span></td>
           ${document.body.dataset.role === "cashier" ? "" : `<td class="r mono" style="font-weight:700">${I7.money(r.total_c)}</td>`}
           <td class="r acts">
+             ${r.cust_email && NEEDS_SENDING.includes(r.email_status || "not_sent")
+               ? `<button class="mini send" data-send="${r.id}" data-no="${I7.esc(r.number)}"
+                          data-to="${I7.esc(r.cust_email)}">${
+                    (r.email_attempts || 0) > 0 ? "Resend" : "Send"}</button>` : ""}
              <button class="mini" data-edit="${r.id}">Edit</button>
              ${document.body.dataset.role === "cashier" ? "" :
                `<button class="mini del" data-del="${r.id}" data-no="${I7.esc(r.number)}">Delete</button>`}
            </td>
         </tr>`;
       }).join("");
-    } catch (e) {
-      $("rcount").textContent = e.message;
-      $("rows").innerHTML = "";
-    }
   }
+
+  /* The last fetch, so the status chips filter instantly. */
+  let lastRows = [];
+  function applyFilter() {
+    renderStrip(lastRows);
+    const g = EGROUPS.find(([k]) => k === efilter);
+    const rows = efilter === "all" ? lastRows
+               : efilter === "noaddr" ? lastRows.filter((r) => !r.cust_email)
+               : lastRows.filter((r) => r.cust_email && g[2](r));
+    paint(rows);
+  }
+
+  $("estrip").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-ef]");
+    if (!b) return;
+    efilter = b.dataset.ef;
+    applyFilter();
+  });
 
   function debounced() { clearTimeout(timer); timer = setTimeout(search, 180); }
 
@@ -240,6 +276,22 @@
     const ed = e.target.closest("[data-edit]");
     if (ed) { location.href = "/?edit=" + ed.dataset.edit; return; }
 
+    /* Sending from the list, so a cashier can finish an invoice that
+       never reached the customer without opening it first. */
+    const snd = e.target.closest("[data-send]");
+    if (snd) {
+      /* The address from the row's own data, not scraped out of the
+         cell, which also holds the badge and the timestamp. */
+      if (!confirm(`Send invoice ${snd.dataset.no} to:\n\n${snd.dataset.to}\n\nIs that address correct?`)) return;
+      snd.disabled = true; snd.textContent = "Sending\u2026";
+      try {
+        const out = await I7.api("/api/invoices/" + snd.dataset.send + "/email", { method: "POST" });
+        if (!out.sent) alert("It did not send. " + (out.error || ""));
+      } catch (err) { alert(err.message); }
+      search();
+      return;
+    }
+
     const del = e.target.closest("[data-del]");
     if (del) {
       const no = del.dataset.no;
@@ -285,7 +337,43 @@
     if (e.key === "/" && document.activeElement !== $("q")) { e.preventDefault(); $("q").focus(); }
   });
 
-  function epill(st) {
+  /* The states that mean the customer still has not got it. Matches the
+     same list on the server. */
+  const NEEDS_SENDING = ["not_sent", "failed", "bounced", "blocked",
+                         "bad_address", "spam", "soft_bounce"];
+
+  /* When it went, and when it landed, in the shop's own clock. */
+  function estamp(r) {
+    if (!r.email_sent_at) return "";
+    const sent = `Sent ${I7.niceDateTime(r.email_sent_at)}`;
+    const got  = r.email_delivered_at
+      ? `<br>Delivered ${I7.niceDateTime(r.email_delivered_at)}` : "";
+    const tries = (r.email_attempts || 0) > 1 ? ` (attempt ${r.email_attempts})` : "";
+    return `<span class="estamp">${sent}${tries}${got}</span>`;
+  }
+
+  /* Counts for the list below, each one a filter. */
+  const EGROUPS = [
+    ["all",       "All",         () => true],
+    ["delivered", "Delivered",   (r) => r.email_status === "delivered"],
+    ["onway",     "On the way",  (r) => r.email_status === "sent" || r.email_status === "soft_bounce"],
+    ["problem",   "Problem",     (r) => ["failed","bounced","blocked","bad_address","spam"].includes(r.email_status)],
+    ["notsent",   "Not sent",    (r) => !r.email_status || r.email_status === "not_sent"],
+    ["noaddr",    "No address",  (r) => !r.cust_email]
+  ];
+  let efilter = "all";
+
+  function renderStrip(rows) {
+    $("estrip").innerHTML = EGROUPS.map(([k, label, test]) => {
+      const n = k === "all" ? rows.length : rows.filter((r) => r.cust_email && test(r)).length;
+      const nn = k === "noaddr" ? rows.filter((r) => !r.cust_email).length : n;
+      if (k !== "all" && nn === 0) return "";
+      return `<button class="echip ${k}${efilter === k ? " on" : ""}" data-ef="${k}">
+                ${label} <b>${nn}</b></button>`;
+    }).join("");
+  }
+
+  function epill(st, reason) {
     if (!st || st === "not_sent") return "";
     /* "Sent" only means Brevo took the message. The rest come back from
        Brevo's webhook once it knows what really happened. */
@@ -298,7 +386,10 @@
                   bad_address: ["failed", "Bad address"], no_address: ["", "No address"],
                   disabled: ["", "Sending off"] };
     const m = map[st] || ["", st];
-    return `<span class="epill ${m[0]}">${m[1]}</span>`;
+    /* The mail server's own words, on hover, so nobody has to open Brevo
+       to find out why a message did not arrive. */
+    const why = reason ? ` title="${I7.esc(reason)}"` : "";
+    return `<span class="epill ${m[0]}"${why}>${m[1]}</span>`;
   }
 
   $("btn-logout").addEventListener("click", async () => {

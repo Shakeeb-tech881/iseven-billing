@@ -192,7 +192,10 @@
 
     if (r.sent) {
       box.classList.remove("bad");
-      msg.textContent = "Invoice emailed to " + r.to;
+      /* The exact moment, so the cashier can tell the customer when it
+         went and it matches what the dashboard shows. */
+      const when = I7.niceDateTime(r.sent_at || Date.now());
+      msg.textContent = `Invoice emailed to ${r.to}${when ? " on " + when : ""}`;
       btn.style.display = "none";
     } else {
       box.classList.add("bad");
@@ -572,8 +575,8 @@
            an address the Send button belongs on screen straight away
            rather than only after another save. */
         showMail(inv.cust_email
-          ? (inv.email_status === "sent"
-              ? { sent: true, to: inv.cust_email }
+          ? (inv.email_status === "sent" || inv.email_status === "delivered"
+              ? { sent: true, to: inv.cust_email, sent_at: inv.email_sent_at }
               : { sent: false, reason: "not_sent" })
           : null);
       } catch (e) { showErr("Could not load that invoice: " + e.message); }

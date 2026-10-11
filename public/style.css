@@ -661,3 +661,4 @@ input[type=number]::-webkit-inner-spin-button{
 .echip.nothing b{color:#f3dfa8}
 .mini.wa{border-color:#2f8f63;color:#7fe3ae}
 .mini.wa:hover{background:#2f8f63;color:#061a10}
+.estamp .who{color:var(--on-dark);font-weight:600}

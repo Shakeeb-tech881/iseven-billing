@@ -143,6 +143,13 @@ CREATE INDEX IF NOT EXISTS idx_inv_emsgid ON invoices (email_message_id);
 CREATE INDEX IF NOT EXISTS idx_inv_email  ON invoices (lower(cust_email));
 CREATE INDEX IF NOT EXISTS idx_inv_estat  ON invoices (email_status);
 
+-- An invoice can reach the customer without email: handed over on
+-- WhatsApp, or printed at the counter. Recording that is what stops a
+-- finished sale sitting in the "nothing sent" list for ever.
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS handed_over_at  timestamptz;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS handed_over_how text;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS handed_over_by  text;
+
 -- ===========================================================
 -- Warranty types (shop / apple_care / company).
 -- Safe to run on an existing database.

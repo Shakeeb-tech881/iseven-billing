@@ -652,3 +652,6 @@ input[type=number]::-webkit-inner-spin-button{
 .estamp{display:block;margin-top:3px;font-size:10px;color:var(--on-dark-soft);line-height:1.4}
 .mini.send{border-color:var(--lime-dim);color:var(--lime)}
 .mini.send:hover{background:var(--lime);color:var(--ink)}
+
+.loadwrap{padding:12px 15px;text-align:center}
+.loadwrap:has(#loadmore[style*="none"]){padding:0}

@@ -164,15 +164,27 @@
                  : efilter === "noaddr" ? all.filter((r) => !r.cust_email)
                  : all.filter((r) => r.cust_email && g[2](r));
       const total = rows.reduce((a, r) => a + r.total_c, 0);
-      const today = document.body.dataset.role === "cashier" ? " today" : "";
       /* A full page back means there are probably more behind it. Saying
          so matters, because the total beside this line only adds up what
          is actually loaded. */
       const capped = all.length >= pageLimit;
+      /* "4 invoices today" was a lie whenever older unsent ones were in
+         the list. Count what is actually from today and say both. */
+      const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Colombo" });
+      const isToday = (r) => r.created_at &&
+        new Date(r.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Colombo" }) === todayStr;
+      const cashier = document.body.dataset.role === "cashier";
+      const nToday = all.filter(isToday).length;
+      const older  = all.length - nToday;
+      /* The breakdown is only meaningful for a cashier, whose list is
+         "today plus the unfinished". An admin is just browsing. */
+      const detail = !cashier ? ""
+                   : older ? ` \u2014 ${nToday} today, ${older} still to send`
+                           : " today";
       $("rcount").textContent = all.length
-        ? `${all.length} invoice${all.length === 1 ? "" : "s"}${today}`
+        ? `${all.length} invoice${all.length === 1 ? "" : "s"}${detail}`
           + (capped ? " \u2014 showing the most recent" : "")
-        : (today ? "No invoices yet today" : "No results");
+        : (cashier ? "Nothing to do" : "No results");
       $("loadmore").style.display = capped ? "inline-block" : "none";
       /* The takings sum is removed from the page for cashiers, so it may
          not exist; writing to it unguarded crashed the whole search. */
@@ -455,12 +467,9 @@
         if (th.textContent.trim() === "Total") th.remove();
       });
       document.body.dataset.role = "cashier";
-      /* The server only returns today's invoices to a cashier, so the date
-         filters would do nothing. Hidden, not removed: search() reads them. */
-      document.querySelector(".chips").style.display = "none";
-      $("from").closest(".field").style.display = "none";
-      $("to").closest(".field").style.display = "none";
-      $("q").placeholder = "Search today's invoices \u2014 NIC, IMEI, number, name\u2026";
+      /* The date range works for cashiers too: within their scope — today,
+         plus anything not yet delivered — they can pick any period. */
+      $("q").placeholder = "Search \u2014 NIC, IMEI, number, name\u2026";
     } else {
       loadStats();
     }

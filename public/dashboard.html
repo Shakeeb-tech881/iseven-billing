@@ -159,10 +159,7 @@
       const all = await I7.api("/api/invoices?" + p.toString());
       lastRows = all;
       renderStrip(all);
-      const g = EGROUPS.find(([k]) => k === efilter);
-      const rows = efilter === "all" ? all
-                 : efilter === "noaddr" ? all.filter((r) => !r.cust_email)
-                 : all.filter((r) => r.cust_email && g[2](r));
+      const rows = all.filter((r) => inGroup(r, efilter));
       const total = rows.reduce((a, r) => a + r.total_c, 0);
       /* A full page back means there are probably more behind it. Saying
          so matters, because the total beside this line only adds up what
@@ -208,14 +205,22 @@
           <td>${I7.esc(r.cust_name)}${r.cust_phone ? `<span class="sub">${I7.esc(r.cust_phone)}</span>` : ""}</td>
           <td class="mono">${r.cust_nic ? I7.esc(r.cust_nic) : "<span style='opacity:.35'>\u2014</span>"}</td>
           <td class="mono" style="font-size:11px">${r.imeis ? I7.esc(r.imeis) : "<span style='opacity:.35'>\u2014</span>"}</td>
-          <td style="font-size:11px">${r.cust_email ? I7.esc(r.cust_email) : "<span style='opacity:.35'>\u2014</span>"}${epill(r.email_status, r.email_error)}${estamp(r)}</td>
+          <td style="font-size:11px">${r.cust_email ? I7.esc(r.cust_email) : "<span style='opacity:.35'>\u2014</span>"}${epill(r)}${estamp(r)}</td>
           <td class="r mono">${I7.niceDate(r.issue_date)}<span class="sub"><span class="tag">${modeTag}</span></span></td>
           ${document.body.dataset.role === "cashier" ? "" : `<td class="r mono" style="font-weight:700">${I7.money(r.total_c)}</td>`}
           <td class="r acts">
-             ${r.cust_email && NEEDS_SENDING.includes(r.email_status || "not_sent")
-               ? `<button class="mini send" data-send="${r.id}" data-no="${I7.esc(r.number)}"
-                          data-to="${I7.esc(r.cust_email)}">${
-                    (r.email_attempts || 0) > 0 ? "Resend" : "Send"}</button>` : ""}
+             ${state(r) === "delivered" || state(r) === "handed" || state(r) === "sentold" ? "" : `
+               ${r.cust_email && NEEDS_SENDING.includes(r.email_status || "not_sent")
+                 ? `<button class="mini send" data-send="${r.id}" data-no="${I7.esc(r.number)}"
+                            data-to="${I7.esc(r.cust_email)}">${
+                      (r.email_attempts || 0) > 0 ? "Resend" : "Send"}</button>` : ""}
+               ${I7.waNumber(r.cust_phone)
+                 ? `<button class="mini wa" data-wa="${r.id}" data-no="${I7.esc(r.number)}"
+                            data-num="${I7.esc(I7.waNumber(r.cust_phone))}">WhatsApp</button>` : ""}
+               <button class="mini" data-given="${r.id}" data-no="${I7.esc(r.number)}"
+                       title="Record that the customer already has it">Mark given</button>`}
+             ${state(r) === "handed"
+               ? `<button class="mini" data-ungiven="${r.id}" title="Undo">Undo</button>` : ""}
              <button class="mini" data-edit="${r.id}">Edit</button>
              ${document.body.dataset.role === "cashier" ? "" :
                `<button class="mini del" data-del="${r.id}" data-no="${I7.esc(r.number)}">Delete</button>`}
@@ -234,10 +239,7 @@
   let lastRows = [];
   function applyFilter() {
     renderStrip(lastRows);
-    const g = EGROUPS.find(([k]) => k === efilter);
-    const rows = efilter === "all" ? lastRows
-               : efilter === "noaddr" ? lastRows.filter((r) => !r.cust_email)
-               : lastRows.filter((r) => r.cust_email && g[2](r));
+    const rows = lastRows.filter((r) => inGroup(r, efilter));
     /* The sum has to follow the filter, or picking "Problem" leaves the
        total of every invoice sitting beside three rows. */
     const rsum = $("rsum");
@@ -262,6 +264,16 @@
     efilter = b.dataset.ef;
     applyFilter();
   });
+
+  /* Recorded against the cashier's own name when they typed one on the
+     invoice, so the handover is not anonymous. */
+  async function mark(id, how) {
+    try {
+      await I7.api("/api/invoices/" + id + "/handover",
+                   { method: "POST", body: JSON.stringify({ how }) });
+    } catch (err) { alert(err.message); }
+    search();
+  }
 
   function debounced() {
     pageLimit = PAGE;              // a new search starts from the top
@@ -338,6 +350,40 @@
       return;
     }
 
+    /* WhatsApp: open the chat with the customer, then record it. The PDF
+       still has to be attached by hand — the browser cannot do that — so
+       it downloads at the same time, ready to drag in. */
+    const wa = e.target.closest("[data-wa]");
+    if (wa) {
+      window.open("/api/invoices/" + wa.dataset.wa + "/pdf", "_blank");
+      window.open("https://wa.me/" + wa.dataset.num, "_blank");
+      if (confirm(`WhatsApp opened for ${wa.dataset.no}, and the PDF is downloading.\n\n`
+                + `Attach it in WhatsApp and send it.\n\nMark this invoice as given?`)) {
+        await mark(wa.dataset.wa, "whatsapp");
+      }
+      return;
+    }
+
+    /* Already given some other way: printed, or handed over in person. */
+    const gv = e.target.closest("[data-given]");
+    if (gv) {
+      const how = prompt(`How did ${gv.dataset.no} reach the customer?\n\n`
+                       + `Type 1 for WhatsApp, 2 for Printed, 3 for another way.`, "1");
+      if (how === null) return;
+      await mark(gv.dataset.given, { "1": "whatsapp", "2": "printed" }[how.trim()] || "other");
+      return;
+    }
+
+    const ug = e.target.closest("[data-ungiven]");
+    if (ug) {
+      try {
+        await I7.api("/api/invoices/" + ug.dataset.ungiven + "/handover",
+                     { method: "POST", body: JSON.stringify({ undo: true }) });
+      } catch (err) { alert(err.message); }
+      search();
+      return;
+    }
+
     const del = e.target.closest("[data-del]");
     if (del) {
       const no = del.dataset.no;
@@ -383,13 +429,33 @@
     if (e.key === "/" && document.activeElement !== $("q")) { e.preventDefault(); $("q").focus(); }
   });
 
-  /* The states that mean the customer still has not got it. Matches the
-     same list on the server. */
+  /* The states that mean the customer still has not got it by email. */
   const NEEDS_SENDING = ["not_sent", "failed", "bounced", "blocked",
                          "bad_address", "spam", "soft_bounce"];
+  const PROBLEMS = ["failed", "bounced", "blocked", "bad_address", "spam"];
+  /* Anything emailed longer ago than this will never get a report: it
+     predates the webhook, or Brevo simply never said. Treated as done. */
+  const SETTLED_MS = 48 * 3600 * 1000;
+  const settledSend = (r) => r.email_status === "sent" && r.email_sent_at &&
+        new Date(r.email_sent_at).getTime() < Date.now() - SETTLED_MS;
+
+  /* One answer to "where does this invoice stand", used by the badge,
+     the counts and the buttons so they can never disagree. */
+  function state(r) {
+    if (r.email_status === "delivered")      return "delivered";
+    if (r.handed_over_at)                    return "handed";
+    if (PROBLEMS.includes(r.email_status))   return "problem";
+    if (settledSend(r))                      return "sentold";
+    if (r.email_status === "sent" || r.email_status === "soft_bounce") return "onway";
+    return "nothing";
+  }
 
   /* When it went, and when it landed, in the shop's own clock. */
   function estamp(r) {
+    if (r.handed_over_at) {
+      const by = r.handed_over_by ? ` by ${I7.esc(r.handed_over_by)}` : "";
+      return `<span class="estamp">Given ${I7.niceDateTime(r.handed_over_at)}${by}</span>`;
+    }
     if (!r.email_sent_at) return "";
     const sent = `Sent ${I7.niceDateTime(r.email_sent_at)}`;
     const got  = r.email_delivered_at
@@ -400,41 +466,51 @@
 
   /* Counts for the list below, each one a filter. */
   const EGROUPS = [
-    ["all",       "All",         () => true],
-    ["delivered", "Delivered",   (r) => r.email_status === "delivered"],
-    ["onway",     "On the way",  (r) => r.email_status === "sent" || r.email_status === "soft_bounce"],
-    ["problem",   "Problem",     (r) => ["failed","bounced","blocked","bad_address","spam"].includes(r.email_status)],
-    ["notsent",   "Not sent",    (r) => !r.email_status || r.email_status === "not_sent"],
-    ["noaddr",    "No address",  (r) => !r.cust_email]
+    ["all",       "All",            null],
+    ["delivered", "Delivered",      "delivered"],
+    ["handed",    "Given by hand",  "handed"],
+    ["sentold",   "Sent",           "sentold"],
+    ["onway",     "On the way",     "onway"],
+    ["problem",   "Problem",        "problem"],
+    ["nothing",   "Nothing sent",   "nothing"]
   ];
   let efilter = "all";
+  const inGroup = (r, k) => k === "all" || state(r) === k;
 
   function renderStrip(rows) {
-    $("estrip").innerHTML = EGROUPS.map(([k, label, test]) => {
-      const n = k === "all" ? rows.length : rows.filter((r) => r.cust_email && test(r)).length;
-      const nn = k === "noaddr" ? rows.filter((r) => !r.cust_email).length : n;
-      if (k !== "all" && nn === 0) return "";
+    $("estrip").innerHTML = EGROUPS.map(([k, label]) => {
+      const n = k === "all" ? rows.length : rows.filter((r) => state(r) === k).length;
+      if (k !== "all" && n === 0) return "";
       return `<button class="echip ${k}${efilter === k ? " on" : ""}" data-ef="${k}">
-                ${label} <b>${nn}</b></button>`;
+                ${label} <b>${n}</b></button>`;
     }).join("");
   }
 
-  function epill(st, reason) {
-    if (!st || st === "not_sent") return "";
-    /* "Sent" only means Brevo took the message. The rest come back from
-       Brevo's webhook once it knows what really happened. */
+  const HOW = { whatsapp: "WhatsApp", printed: "Printed", other: "By hand" };
+
+  function epill(r) {
+    const s = state(r);
+    if (s === "handed")
+      return `<span class="epill ok" title="Given to the customer without email">`
+           + `Given \u2014 ${I7.esc(HOW[r.handed_over_how] || "by hand")}</span>`;
+    if (s === "sentold")
+      return `<span class="epill sent" title="Emailed before delivery reporting was switched on, `
+           + `so no confirmation exists. Treated as done.">Sent \u2014 no report</span>`;
+    if (s === "nothing") return "";
+
     const map = { sent: ["sent", "Sent"], delivered: ["ok", "Delivered"],
                   bounced: ["failed", "Bounced \u2014 wrong address"],
                   blocked: ["failed", "Blocked"], spam: ["warn", "Marked spam"],
                   soft_bounce: ["warn", "Not yet delivered"],
                   unsubscribed: ["warn", "Unsubscribed"],
                   failed: ["failed", "Failed"],
-                  bad_address: ["failed", "Bad address"], no_address: ["", "No address"],
+                  bad_address: ["failed", "Bad address"],
                   disabled: ["", "Sending off"] };
-    const m = map[st] || ["", st];
+    const m = map[r.email_status] || ["", r.email_status || ""];
+    if (!m[1]) return "";
     /* The mail server's own words, on hover, so nobody has to open Brevo
        to find out why a message did not arrive. */
-    const why = reason ? ` title="${I7.esc(reason)}"` : "";
+    const why = r.email_error ? ` title="${I7.esc(r.email_error)}"` : "";
     return `<span class="epill ${m[0]}"${why}>${m[1]}</span>`;
   }
 

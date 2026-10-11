@@ -53,6 +53,23 @@
     return `${p[2]} ${MON[Number(p[1]) - 1]} ${p[0]}`;
   }
 
+  /* A stored timestamp shown in the shop's own clock. The server keeps
+     UTC; staff think in Colombo time, so the conversion happens here. */
+  const SHOP_TZ = "Asia/Colombo";
+  function niceDateTime(v) {
+    if (!v) return "";
+    const d = new Date(v);
+    if (isNaN(d)) return "";
+    const p = new Intl.DateTimeFormat("en-GB", {
+      timeZone: SHOP_TZ, day: "2-digit", month: "numeric", year: "numeric",
+      hour: "numeric", minute: "2-digit", hour12: true
+    }).formatToParts(d).reduce((o, x) => (o[x.type] = x.value, o), {});
+    /* MON, not the browser's month name, so it reads "Sep" like the rest
+       of the invoice rather than "Sept". */
+    return `${p.day} ${MON[Number(p.month) - 1]} ${p.year}, `
+         + `${p.hour}:${p.minute} ${p.dayPeriod.toLowerCase()}`;
+  }
+
   /* -------------------------------------------------------
      Tax engine — mirrors server.js exactly.
        none      total = net
@@ -378,5 +395,6 @@
 
   global.I7 = { cents, money, esc, pad, isoToday, addDays, niceDate,
                 computeTotals, TAX_NOTES, renderPaper, api,
-                WARRANTY_TYPES, warrantyLabel, warrantyShort, emailProblem };
+                WARRANTY_TYPES, warrantyLabel, warrantyShort, emailProblem,
+                niceDateTime };
 })(window);

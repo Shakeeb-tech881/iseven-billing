@@ -633,3 +633,22 @@ input[type=number]::-webkit-inner-spin-button{
   padding:1px 6px;margin:0 2px;cursor:pointer;
 }
 .fixmail:hover{background:#f3d477}
+
+/* ---- who has received their invoice ---- */
+.estrip{display:flex;flex-wrap:wrap;gap:6px;padding:9px 15px;border-bottom:1px solid var(--ink-3)}
+.estrip:empty{display:none}
+.echip{
+  font-family:var(--sans);font-size:10.5px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;padding:5px 10px;border-radius:2px;cursor:pointer;
+  background:transparent;border:1px solid var(--ink-3);color:var(--on-dark-soft);
+}
+.echip:hover{background:var(--ink-3);color:var(--on-dark)}
+.echip b{font-family:var(--mono);margin-left:3px;color:var(--on-dark)}
+.echip.on{background:var(--lime);border-color:var(--lime);color:var(--ink)}
+.echip.on b{color:var(--ink)}
+.echip.problem b{color:#ffb3ac}
+.echip.delivered b{color:#9fe8b4}
+.echip.on b{color:var(--ink)}
+.estamp{display:block;margin-top:3px;font-size:10px;color:var(--on-dark-soft);line-height:1.4}
+.mini.send{border-color:var(--lime-dim);color:var(--lime)}
+.mini.send:hover{background:var(--lime);color:var(--ink)}

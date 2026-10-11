@@ -214,9 +214,9 @@
                  ? `<button class="mini send" data-send="${r.id}" data-no="${I7.esc(r.number)}"
                             data-to="${I7.esc(r.cust_email)}">${
                       (r.email_attempts || 0) > 0 ? "Resend" : "Send"}</button>` : ""}
-               ${I7.waNumber(r.cust_phone)
-                 ? `<button class="mini wa" data-wa="${r.id}" data-no="${I7.esc(r.number)}"
-                            data-num="${I7.esc(I7.waNumber(r.cust_phone))}">WhatsApp</button>` : ""}
+               <button class="mini wa" data-wa="${r.id}" data-no="${I7.esc(r.number)}"
+                       data-num="${I7.esc(I7.waNumber(r.cust_phone))}"
+                       title="Download the PDF to send on WhatsApp">Download</button>
                <button class="mini" data-given="${r.id}" data-no="${I7.esc(r.number)}"
                        title="Record that the customer already has it">Mark given</button>`}
              ${state(r) === "handed"
@@ -350,15 +350,15 @@
       return;
     }
 
-    /* WhatsApp: open the chat with the customer, then record it. The PDF
-       still has to be attached by hand — the browser cannot do that — so
-       it downloads at the same time, ready to drag in. */
+    /* Download the PDF so it can be attached in WhatsApp by hand — a web
+       page cannot put a file into another app. Then offer to record it.
+       Only one window is opened: a second one gets blocked as a popup. */
     const wa = e.target.closest("[data-wa]");
     if (wa) {
       window.open("/api/invoices/" + wa.dataset.wa + "/pdf", "_blank");
-      window.open("https://wa.me/" + wa.dataset.num, "_blank");
-      if (confirm(`WhatsApp opened for ${wa.dataset.no}, and the PDF is downloading.\n\n`
-                + `Attach it in WhatsApp and send it.\n\nMark this invoice as given?`)) {
+      if (confirm(`${wa.dataset.no}.pdf is downloading.\n\n`
+                + `Send it to the customer on WhatsApp, then press OK to record it.\n\n`
+                + `Press Cancel if you have not sent it yet.`)) {
         await mark(wa.dataset.wa, "whatsapp");
       }
       return;

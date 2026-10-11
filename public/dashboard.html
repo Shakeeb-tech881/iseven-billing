@@ -265,12 +265,38 @@
     applyFilter();
   });
 
-  /* Recorded against the cashier's own name when they typed one on the
-     invoice, so the handover is not anonymous. */
+  /* The till is shared, so the system cannot know which member of staff
+     is standing at it. Asking once per device and remembering the answer
+     is the honest middle: the name is typed, the role beside it comes
+     from the session and cannot be typed over. */
+  function staffName() {
+    let confirmed = "", remembered = "";
+    try {
+      confirmed  = sessionStorage.getItem("i7_staff") || "";
+      remembered = localStorage.getItem("i7_staff") || "";
+    } catch (e) { /* private mode */ }
+    /* Asked once per sign-in, not on every click. A new shift signs in
+       again and is asked again, so the name cannot quietly belong to
+       whoever used the till yesterday. */
+    if (confirmed) return confirmed;
+    const asked = prompt("Who is marking invoices as given?\n\n"
+                       + "Asked once each time you sign in. Shown on the invoice "
+                       + "beside your role.", remembered);
+    if (asked === null) return null;                 // cancelled
+    const name = asked.trim().slice(0, 40);
+    try {
+      sessionStorage.setItem("i7_staff", name);
+      localStorage.setItem("i7_staff", name);
+    } catch (e) { /* ignore */ }
+    return name;
+  }
+
   async function mark(id, how) {
+    const by = staffName();
+    if (by === null) return;
     try {
       await I7.api("/api/invoices/" + id + "/handover",
-                   { method: "POST", body: JSON.stringify({ how }) });
+                   { method: "POST", body: JSON.stringify({ how, by }) });
     } catch (err) { alert(err.message); }
     search();
   }
@@ -453,7 +479,8 @@
   /* When it went, and when it landed, in the shop's own clock. */
   function estamp(r) {
     if (r.handed_over_at) {
-      const by = r.handed_over_by ? ` by ${I7.esc(r.handed_over_by)}` : "";
+      const by = r.handed_over_by
+        ? `<br>Marked by <b class="who">${I7.esc(r.handed_over_by)}</b>` : "";
       return `<span class="estamp">Given ${I7.niceDateTime(r.handed_over_at)}${by}</span>`;
     }
     if (!r.email_sent_at) return "";

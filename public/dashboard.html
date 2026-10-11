@@ -79,6 +79,9 @@
       <tbody id="rows"></tbody>
     </table>
     <div class="nores" id="nores" style="display:none">No invoices match that search.</div>
+    <div class="loadwrap">
+      <button class="btn ghost sm" id="loadmore" style="display:none">Load more</button>
+    </div>
   </div>
 </div>
 
@@ -146,7 +149,8 @@
   async function search() {
     const p = new URLSearchParams({
       q: $("q").value.trim(),
-      field: $("field").value
+      field: $("field").value,
+      limit: String(pageLimit)
     });
     if ($("from").value) p.set("from", $("from").value);
     if ($("to").value)   p.set("to", $("to").value);
@@ -161,9 +165,15 @@
                  : all.filter((r) => r.cust_email && g[2](r));
       const total = rows.reduce((a, r) => a + r.total_c, 0);
       const today = document.body.dataset.role === "cashier" ? " today" : "";
-      $("rcount").textContent = rows.length
-        ? `${rows.length} invoice${rows.length === 1 ? "" : "s"}${today}`
+      /* A full page back means there are probably more behind it. Saying
+         so matters, because the total beside this line only adds up what
+         is actually loaded. */
+      const capped = all.length >= pageLimit;
+      $("rcount").textContent = all.length
+        ? `${all.length} invoice${all.length === 1 ? "" : "s"}${today}`
+          + (capped ? " \u2014 showing the most recent" : "")
         : (today ? "No invoices yet today" : "No results");
+      $("loadmore").style.display = capped ? "inline-block" : "none";
       /* The takings sum is removed from the page for cashiers, so it may
          not exist; writing to it unguarded crashed the whole search. */
       const rsum = $("rsum");
@@ -202,6 +212,12 @@
       }).join("");
   }
 
+  /* How many rows to ask for. "Load more" raises it rather than paging,
+     which keeps the totals and the status counts covering everything on
+     screen instead of one page of it. */
+  const PAGE = 500;
+  let pageLimit = PAGE;
+
   /* The last fetch, so the status chips filter instantly. */
   let lastRows = [];
   function applyFilter() {
@@ -210,8 +226,23 @@
     const rows = efilter === "all" ? lastRows
                : efilter === "noaddr" ? lastRows.filter((r) => !r.cust_email)
                : lastRows.filter((r) => r.cust_email && g[2](r));
+    /* The sum has to follow the filter, or picking "Problem" leaves the
+       total of every invoice sitting beside three rows. */
+    const rsum = $("rsum");
+    if (rsum) rsum.textContent = rows.length
+      ? `Total ${rows[0].currency || "LKR"} ${I7.money(rows.reduce((a, r) => a + r.total_c, 0))}` : "";
+    $("nores").style.display = rows.length ? "none" : "block";
     paint(rows);
   }
+
+  $("loadmore").addEventListener("click", async () => {
+    pageLimit += PAGE;
+    $("loadmore").disabled = true;
+    $("loadmore").textContent = "Loading\u2026";
+    await search();
+    $("loadmore").disabled = false;
+    $("loadmore").textContent = "Load more";
+  });
 
   $("estrip").addEventListener("click", (e) => {
     const b = e.target.closest("[data-ef]");
@@ -220,7 +251,10 @@
     applyFilter();
   });
 
-  function debounced() { clearTimeout(timer); timer = setTimeout(search, 180); }
+  function debounced() {
+    pageLimit = PAGE;              // a new search starts from the top
+    clearTimeout(timer); timer = setTimeout(search, 180);
+  }
 
   ["q"].forEach((id) => $(id).addEventListener("input", debounced));
   ["field", "from", "to"].forEach((id) => $(id).addEventListener("change", search));

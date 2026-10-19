@@ -343,11 +343,12 @@
     } else if (mode === "vat") {
       rows += `<tr><td class="lab">VAT ${Number(d.vat_rate) || 0}%</td><td class="val">${cur} ${money(t.vat_c)}</td></tr>`;
     }
-    rows += `<tr class="grand"><td class="lab">Total due</td><td class="val">${cur} ${money(t.total_c)}</td></tr>`;
+    rows += `<tr class="grand"><td class="lab">Total paid</td><td class="val">${cur} ${money(t.total_c)}</td></tr>`;
 
     const inclNote = mode === "incl"
       ? `<div class="vat-incl-note">Includes VAT ${Number(d.vat_rate) || 0}% of ${cur} ${money(t.incl_vat_c)}</div>`
       : "";
+    const powered = `<div class="powered">POWERED BY IDEALZ LANKA PRIVATE LIMITED</div>`;
 
     /* --- warranty panel --- */
     /* The item lines already carry type, days and expiry, so the warranty
@@ -364,7 +365,7 @@
 
     const footer = `<div class="footline">
         <div>Thank you for your business.</div>
-        <div class="mono">${d.cashier ? "Served by " + esc(d.cashier) + " \u00b7 " : ""}info@iseven.lk</div>
+        <div class="mono">${d.cashier ? "Served by " + esc(d.cashier) + " \u00b7 " : ""}${esc(d.biz_email || "info@iseven.lk")}</div>
       </div>`;
 
     return `${head}
@@ -385,6 +386,7 @@
         </table>
         <div class="sums"><table><tbody>${rows}</tbody></table></div>
         ${inclNote}
+        ${powered}
         ${warranty}
         ${terms}
         ${footer}

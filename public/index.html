@@ -62,6 +62,11 @@
         <div class="field"><label>Currency</label><input id="currency"></div>
         <div class="field"><label>Served by</label><input id="cashier" placeholder="Cashier name"></div>
       </div>
+      <div class="row2">
+        <div class="field" id="branch-field"><label>Branch</label>
+          <select id="branch"></select>
+        </div>
+      </div>
       <p class="hint">The invoice number is issued by the system when you save, in unbroken sequence. Leave the due date blank for a normal counter sale — it is only printed when the customer owes money later.</p>
     </div>
 
@@ -144,7 +149,8 @@
      an unsaved edit from the stored recipient. */
   let savedEmail = "";
   let mailOn = false;
-
+  let sessionBranch = null;
+  let branches = [];
   /* A mistyped address looks exactly like a success, because the bounce
      comes back to Brevo long after the customer has left. So the obvious
      slips are caught here, at the counter, while they can still be asked. */
@@ -245,6 +251,7 @@
       cust_address: $("cust_address").value,
       cust_email: $("cust_email").value.trim().toLowerCase(),
       cashier: $("cashier").value,
+      branch: $("branch").value || undefined,
       discount_c: I7.cents($("discount").value),
       warranty_text: $("warranty_text").value,
       terms: $("terms").value,
@@ -341,6 +348,7 @@
       renderPaper();
       return;
     }
+    if (el.id === "branch") renderPaper();
     if (el.id === "tax_mode") renderTaxUI();
     if (el.id === "currency") renderItems();
     if (el.id === "issue_date") {
@@ -514,8 +522,27 @@
     try {
       const sess = await fetch("/api/session").then((r) => r.json());
       mailOn = Boolean(sess.mail);
+      sessionBranch = sess.branch || null;
     } catch { /* stay usable offline */ }
     $("mail-on").textContent = mailOn ? "\u00b7 send after saving" : "\u00b7 sending is off";
+
+    /* Which shop this invoice belongs to. A cashier's branch comes from
+       their password, so the box only shows it; the owner may choose. */
+    try {
+      branches = await I7.api("/api/branches");
+      const list = branches;
+      const sel = $("branch");
+      sel.innerHTML = list.map((b) =>
+        `<option value="${I7.esc(b.code)}">${I7.esc(b.name)}</option>`).join("");
+      if (sessionBranch) {
+        sel.value = sessionBranch;
+        sel.disabled = true;
+      }
+      if (list.length < 2 && !sessionBranch) {
+        $("branch-field").style.display = "none";   // one shop, nothing to pick
+      }
+      renderPaper();
+    } catch { $("branch-field").style.display = "none"; }
 
     const today = I7.isoToday();
     $("issue_date").value = today;

@@ -151,9 +151,10 @@ ALTER TABLE invoices ADD COLUMN IF NOT EXISTS handed_over_how text;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS handed_over_by  text;
 
 -- ----------------------------------------------------------
--- Branches. One system, one invoice series, three shops: each
--- prints its own name and address, and its own staff see only
--- their own sales. The owner sees all of them.
+-- Branches. One system, one invoice series, three shops. The branch
+-- records which shop issued an invoice and nothing more: all of them
+-- print the same I7SEVEN details, taken from settings. A shop's staff
+-- see only their own sales; the owner sees all of them.
 -- ----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS branches (
   code     text PRIMARY KEY,
@@ -165,6 +166,11 @@ CREATE TABLE IF NOT EXISTS branches (
   sort     int  NOT NULL DEFAULT 0,
   active   boolean NOT NULL DEFAULT true
 );
+
+/* Same as the other tables: the app connects as the database user and
+   is unaffected, while the anon and authenticated API keys are shut
+   out. Without this, Supabase warns that the table is reachable. */
+ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
 
 -- Everything issued before branches existed belongs to iSeven.
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS branch text NOT NULL DEFAULT 'iseven';

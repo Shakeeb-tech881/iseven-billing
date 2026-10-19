@@ -111,9 +111,9 @@ INSERT INTO counters (name, value) VALUES ('invoice', 0)
 
 INSERT INTO settings (key, value) VALUES
   ('biz_name',              'I7SEVEN MOBILES'),
-  ('biz_lines',             E'No. 63, First Floor, Liberty Plaza, Colombo 03\n+94 77 311 1999 · info@iseven.lk'),
+  ('biz_lines',             E'No. 63, First Floor, Liberty Plaza, Colombo 03\n+94 77 755 9955 · info@iseven.lk'),
   ('biz_address',           'No. 63, First Floor, Liberty Plaza, Colombo 03'),
-  ('biz_phone',             '+94 77 311 1999'),
+  ('biz_phone',             '+94 77 755 9955'),
   ('biz_email',             'info@iseven.lk'),
   ('vat_no',                ''),
   ('number_prefix',         'I7-'),
@@ -149,6 +149,32 @@ CREATE INDEX IF NOT EXISTS idx_inv_estat  ON invoices (email_status);
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS handed_over_at  timestamptz;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS handed_over_how text;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS handed_over_by  text;
+
+-- ----------------------------------------------------------
+-- Branches. One system, one invoice series, three shops: each
+-- prints its own name and address, and its own staff see only
+-- their own sales. The owner sees all of them.
+-- ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS branches (
+  code     text PRIMARY KEY,
+  name     text NOT NULL,
+  address  text,
+  phone    text,
+  email    text,
+  vat_no   text,
+  sort     int  NOT NULL DEFAULT 0,
+  active   boolean NOT NULL DEFAULT true
+);
+
+-- Everything issued before branches existed belongs to iSeven.
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS branch text NOT NULL DEFAULT 'iseven';
+CREATE INDEX IF NOT EXISTS idx_inv_branch ON invoices (branch);
+
+INSERT INTO branches (code, name, address, phone, email, sort) VALUES
+  ('iseven', 'I7SEVEN MOBILES',
+   'No. 63, First Floor, Liberty Plaza, Colombo 03',
+   '+94 77 755 9955', 'info@iseven.lk', 1)
+ON CONFLICT (code) DO NOTHING;
 
 -- ===========================================================
 -- Warranty types (shop / apple_care / company).

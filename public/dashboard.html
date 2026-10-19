@@ -43,6 +43,9 @@
           <option value="name">Customer name</option>
         </select>
       </div>
+      <div class="field" style="margin:0" id="branch-field"><label>Branch</label>
+        <select id="branch"><option value="">All branches</option></select>
+      </div>
       <div class="field" style="margin:0"><label>From</label><input type="date" id="from"></div>
       <div class="field" style="margin:0"><label>To</label><input type="date" id="to"></div>
       <button class="btn ghost" id="btn-reset">Reset</button>
@@ -67,6 +70,7 @@
       <thead>
         <tr>
           <th>Invoice</th>
+          <th class="bcol">Branch</th>
           <th>Customer</th>
           <th>NIC</th>
           <th>IMEI / serial</th>
@@ -152,6 +156,7 @@
       field: $("field").value,
       limit: String(pageLimit)
     });
+    if ($("branch").value) p.set("branch", $("branch").value);
     if ($("from").value) p.set("from", $("from").value);
     if ($("to").value)   p.set("to", $("to").value);
 
@@ -202,6 +207,7 @@
         const modeTag = { none: "No VAT", vat: "VAT", vat_sscl: "VAT+SSCL", incl: "VAT incl." }[r.tax_mode] || "";
         return `<tr data-id="${r.id}">
           <td class="num">${I7.esc(r.number)}<span class="sub">${r.item_count} item${r.item_count === 1 ? "" : "s"}</span></td>
+          <td class="bcol"><span class="btag">${I7.esc(branchName(r.branch))}</span></td>
           <td>${I7.esc(r.cust_name)}${r.cust_phone ? `<span class="sub">${I7.esc(r.cust_phone)}</span>` : ""}</td>
           <td class="mono">${r.cust_nic ? I7.esc(r.cust_nic) : "<span style='opacity:.35'>\u2014</span>"}</td>
           <td class="mono" style="font-size:11px">${r.imeis ? I7.esc(r.imeis) : "<span style='opacity:.35'>\u2014</span>"}</td>
@@ -301,13 +307,20 @@
     search();
   }
 
+  /* Branch names for the column, keyed by code. */
+  let branches = [];
+  const branchName = (code) => {
+    const b = branches.find((x) => x.code === (code || "iseven"));
+    return b ? b.name : (code || "iseven");
+  };
+
   function debounced() {
     pageLimit = PAGE;              // a new search starts from the top
     clearTimeout(timer); timer = setTimeout(search, 180);
   }
 
   ["q"].forEach((id) => $(id).addEventListener("input", debounced));
-  ["field", "from", "to"].forEach((id) => $(id).addEventListener("change", search));
+  ["field", "from", "to", "branch"].forEach((id) => $(id).addEventListener("change", search));
 
   $("btn-reset").addEventListener("click", () => {
     $("q").value = ""; $("field").value = "all"; $("from").value = ""; $("to").value = "";
@@ -554,6 +567,19 @@
       location.href = "/login.html?next=" + encodeURIComponent(location.pathname);
       return;
     }
+
+    /* The owner picks a branch; a cashier has one and sees no column. */
+    try {
+      branches = await I7.api("/api/branches");
+      if (sess.branch || branches.length < 2) {
+        $("branch-field").style.display = "none";
+        document.body.classList.add("one-branch");
+      } else {
+        $("branch").innerHTML = '<option value="">All branches</option>'
+          + branches.map((b) => `<option value="${I7.esc(b.code)}">${I7.esc(b.name)}</option>`).join("");
+      }
+    } catch { $("branch-field").style.display = "none";
+             document.body.classList.add("one-branch"); }
 
     const tag = $("role-tag");
     if (sess.required) {

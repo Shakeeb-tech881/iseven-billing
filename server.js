@@ -75,17 +75,19 @@ const server = http.createServer(async (req, res) => {
 
       if (p === "/api/login" && req.method === "POST") {
         if (!auth.authEnabled()) return json(res, 200, { ok: true, authDisabled: true });
-        const role = auth.roleForPassword(body.password);
-        if (!role) {
+        const who = auth.roleForPassword(body.password);
+        if (!who) {
           await new Promise((r) => setTimeout(r, 400));
           return json(res, 401, { error: "Wrong password." });
         }
-        return json(res, 200, { ok: true, role }, auth.sessionCookie(role, secure));
+        return json(res, 200, { ok: true, role: who.role, branch: who.branch },
+                    auth.sessionCookie(who.role, secure, who.branch));
       }
       if (p === "/api/logout") return json(res, 200, { ok: true }, auth.clearCookie(secure));
       if (p === "/api/session")
         return json(res, 200, {
           authed: auth.isAuthed(req), role: auth.sessionRole(req),
+          branch: auth.sessionBranch(req),
           required: auth.authEnabled(), mail: require("./lib/mailer.js").mailEnabled()
         });
 
@@ -102,7 +104,7 @@ const server = http.createServer(async (req, res) => {
         return json(res, 403, { error: "Admin access only." });
 
       const out = await billing.handleApi(req.method, p, url.searchParams, body,
-                                        auth.sessionRole(req));
+                                        auth.sessionRole(req), auth.sessionBranch(req));
       if (out.binary) {
         res.writeHead(out.code, {
           "Content-Type": out.contentType,

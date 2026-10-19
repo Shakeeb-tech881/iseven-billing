@@ -28,12 +28,13 @@ module.exports = async (req, res) => {
   try {
     if (p === "/api/login" && req.method === "POST") {
       if (!auth.authEnabled()) return send(res, 200, { ok: true, authDisabled: true });
-      const role = auth.roleForPassword(body.password);
-      if (!role) {
+      const who = auth.roleForPassword(body.password);
+      if (!who) {
         await new Promise((r) => setTimeout(r, 400));
         return send(res, 401, { error: "Wrong password." });
       }
-      return send(res, 200, { ok: true, role }, auth.sessionCookie(role, secure));
+      return send(res, 200, { ok: true, role: who.role, branch: who.branch },
+                  auth.sessionCookie(who.role, secure, who.branch));
     }
 
     if (p === "/api/logout") {
@@ -43,6 +44,7 @@ module.exports = async (req, res) => {
     if (p === "/api/session") {
       return send(res, 200, {
         authed: auth.isAuthed(req), role: auth.sessionRole(req),
+        branch: auth.sessionBranch(req),
         required: auth.authEnabled(), mail: require("../lib/mailer.js").mailEnabled()
       });
     }
@@ -60,7 +62,7 @@ module.exports = async (req, res) => {
       return send(res, 403, { error: "Admin access only." });
 
     const out = await billing.handleApi(req.method, p, url.searchParams, body,
-                                      auth.sessionRole(req));
+                                      auth.sessionRole(req), auth.sessionBranch(req));
     if (out.binary) {
       res.statusCode = out.code;
       res.setHeader("Content-Type", out.contentType);

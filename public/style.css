@@ -310,14 +310,14 @@ table.rt td.acts, table.rt th:last-child{white-space:nowrap}
 table.rt{width:100%;border-collapse:collapse}
 table.rt th{
   text-align:left;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--on-dark-soft);padding:9px 15px;border-bottom:1px solid var(--ink-3);
+  color:var(--on-dark-soft);padding:9px 12px;border-bottom:1px solid var(--ink-3);
 }
 table.rt th.r,table.rt td.r{text-align:right}
-table.rt td{padding:11px 15px;border-bottom:1px solid var(--ink-3);font-size:13px;color:var(--on-dark)}
+table.rt td{padding:11px 12px;border-bottom:1px solid var(--ink-3);font-size:13px;color:var(--on-dark)}
 table.rt tr{cursor:pointer}
 table.rt tbody tr:hover td{background:var(--ink-3)}
 table.rt td.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
-table.rt td.num{font-family:var(--mono);color:var(--lime);font-weight:700}
+table.rt td.num{font-family:var(--mono);color:var(--lime);font-weight:700;white-space:nowrap}
 table.rt td .sub{display:block;font-size:10.5px;color:var(--on-dark-soft);margin-top:2px;font-family:var(--mono)}
 .tag{
   display:inline-block;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
@@ -670,9 +670,12 @@ input[type=number]::-webkit-inner-spin-button{
 }
 
 /* ---- branch column ---- */
+/* Rides under the invoice number rather than in a column of its own, so
+   it costs no width and the email status stays on screen. */
 .btag{
-  display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;
-  padding:3px 7px;border-radius:2px;background:var(--ink-3);color:var(--on-dark);
+  display:inline-block;margin-top:4px;
+  font-size:9px;font-weight:700;letter-spacing:.08em;
+  padding:2px 6px;border-radius:2px;background:var(--ink-3);color:var(--on-dark-soft);
   white-space:nowrap;
 }
-body.one-branch .bcol{display:none}
+body.one-branch .btag{display:none}

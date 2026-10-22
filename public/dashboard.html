@@ -70,7 +70,6 @@
       <thead>
         <tr>
           <th>Invoice</th>
-          <th class="bcol">Branch</th>
           <th>Customer</th>
           <th>NIC</th>
           <th>IMEI / serial</th>
@@ -206,8 +205,7 @@
       $("rows").innerHTML = rows.map((r) => {
         const modeTag = { none: "No VAT", vat: "VAT", vat_sscl: "VAT+SSCL", incl: "VAT incl." }[r.tax_mode] || "";
         return `<tr data-id="${r.id}">
-          <td class="num">${I7.esc(r.number)}<span class="sub">${r.item_count} item${r.item_count === 1 ? "" : "s"}</span></td>
-          <td class="bcol"><span class="btag">${I7.esc(branchName(r.branch))}</span></td>
+          <td class="num">${I7.esc(r.number)}<span class="sub">${r.item_count} item${r.item_count === 1 ? "" : "s"}</span><span class="btag">${I7.esc(branchName(r.branch))}</span></td>
           <td>${I7.esc(r.cust_name)}${r.cust_phone ? `<span class="sub">${I7.esc(r.cust_phone)}</span>` : ""}</td>
           <td class="mono">${r.cust_nic ? I7.esc(r.cust_nic) : "<span style='opacity:.35'>\u2014</span>"}</td>
           <td class="mono" style="font-size:11px">${r.imeis ? I7.esc(r.imeis) : "<span style='opacity:.35'>\u2014</span>"}</td>
@@ -309,9 +307,13 @@
 
   /* Branch names for the column, keyed by code. */
   let branches = [];
+  /* "I7SEVEN MOBILES" on every row is mostly the same word repeated, and
+     the column it needed pushed the email status off the screen. The
+     shop's own word is enough to tell them apart at a glance. */
   const branchName = (code) => {
     const b = branches.find((x) => x.code === (code || "iseven"));
-    return b ? b.name : (code || "iseven");
+    return (b ? b.name : (code || "iseven"))
+             .replace(/\s*MOBILES?\s*$/i, "").trim().toUpperCase();
   };
 
   function debounced() {

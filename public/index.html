@@ -62,6 +62,14 @@
         <div class="field"><label>Currency</label><input id="currency"></div>
         <div class="field"><label>Served by</label><input id="cashier" placeholder="Cashier name"></div>
       </div>
+      <!-- The owner alone picks a shop; a cashier's branch comes from
+           their password, so this stays hidden until the session says
+           admin. Hidden by default, never revealed for a cashier. -->
+      <div class="row2" id="branch-row" style="display:none">
+        <div class="field"><label>Issued for branch</label>
+          <select id="branch"></select>
+        </div>
+      </div>
       <p class="hint">The invoice number is issued by the system when you save, in unbroken sequence. Leave the due date blank for a normal counter sale — it is only printed when the customer owes money later.</p>
     </div>
 
@@ -244,6 +252,9 @@
       cust_address: $("cust_address").value,
       cust_email: $("cust_email").value.trim().toLowerCase(),
       cashier: $("cashier").value,
+      /* Only ever filled in for the owner. The server ignores it for a
+         cashier and uses their own branch, so this cannot be abused. */
+      branch: ($("branch") || {}).value || undefined,
       discount_c: I7.cents($("discount").value),
       warranty_text: $("warranty_text").value,
       terms: $("terms").value,
@@ -438,6 +449,9 @@
       tax_mode: d.tax_mode, vat_rate: d.vat_rate, sscl_rate: d.sscl_rate, vat_no: d.vat_no,
       discount: Number($("discount").value) || 0,
       warranty_text: d.warranty_text, terms: d.terms, cashier: d.cashier,
+      /* Only on a new invoice, and only the owner's box is ever filled.
+         An edit never carries it, so a sale cannot change shop. */
+      ...(editId ? {} : { branch: d.branch }),
       items: items.map((it) => ({
         description: it.description, imei: it.imei,
         pack_items: it.pack_items || "",
@@ -513,7 +527,17 @@
     try {
       const sess = await fetch("/api/session").then((r) => r.json());
       mailOn = Boolean(sess.mail);
-    } catch { /* stay usable offline */ }
+      /* The owner writes for whichever shop; a cashier never sees this,
+         and the server would override it for them in any case. */
+      if (sess.role === "admin" && !sess.branch && !editId) {
+        const list = await I7.api("/api/branches");
+        if (list.length > 1) {
+          $("branch").innerHTML = list.map((b) =>
+            `<option value="${I7.esc(b.code)}">${I7.esc(b.name)}</option>`).join("");
+          $("branch-row").style.display = "";
+        }
+      }
+    } catch { /* stay usable offline: the field simply stays hidden */ }
     $("mail-on").textContent = mailOn ? "\u00b7 send after saving" : "\u00b7 sending is off";
 
     const today = I7.isoToday();

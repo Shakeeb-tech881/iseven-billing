@@ -114,34 +114,55 @@
   let timer = null;
 
   /* ---------------- stats ---------------- */
+  /* What the chosen dates add up to in words, so every figure says
+     which stretch of time it is describing rather than leaving it to
+     be guessed from the buttons. */
+  function periodLabel() {
+    const f = $("from").value, t = $("to").value;
+    if (!f && !t) return "all time";
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Colombo" });
+    if (f && t && f === t) return f === today ? "today" : I7.niceDate(f);
+    const first = today.slice(0, 7) + "-01";
+    if (f === first && t === today) return "this month";
+    if (f && t) return `${I7.niceDate(f)} – ${I7.niceDate(t)}`;
+    return f ? `from ${I7.niceDate(f)}` : `up to ${I7.niceDate(t)}`;
+  }
+
   async function loadStats() {
     try {
-      const s = await I7.api("/api/stats");
+      const p = new URLSearchParams();
+      if ($("branch") && $("branch").value) p.set("branch", $("branch").value);
+      if ($("from").value) p.set("from", $("from").value);
+      if ($("to").value)   p.set("to", $("to").value);
+      const s = await I7.api("/api/stats?" + p.toString());
       const c = s.currency || "LKR";
+      const when = I7.esc(periodLabel());
+      const where = ($("branch") && $("branch").value)
+        ? ` · ${I7.esc(branchName($("branch").value))}` : "";
       $("stats").innerHTML = `
         <div class="stat hero">
-          <div class="k">Sales this month</div>
-          <div class="v">${c} ${I7.money(s.month_total_c)}</div>
+          <div class="k">Sales · ${when}${where}</div>
+          <div class="v">${c} ${I7.money(s.total_c)}</div>
         </div>
         <div class="stat">
-          <div class="k">Invoices this month</div>
-          <div class="v">${s.month_count} <small>/ ${s.today_count} today</small></div>
+          <div class="k">Invoices · ${when}</div>
+          <div class="v">${s.count}</div>
         </div>
         <div class="stat">
-          <div class="k">VAT this month</div>
-          <div class="v">${c} ${I7.money(s.month_vat_c)}</div>
+          <div class="k">VAT · ${when}</div>
+          <div class="v">${c} ${I7.money(s.vat_c)}</div>
         </div>
         <div class="stat">
-          <div class="k">SSCL this month</div>
-          <div class="v">${c} ${I7.money(s.month_sscl_c)}</div>
+          <div class="k">SSCL · ${when}</div>
+          <div class="v">${c} ${I7.money(s.sscl_c)}</div>
+        </div>
+        <div class="stat">
+          <div class="k">Items sold · ${when}</div>
+          <div class="v">${s.items_count}</div>
         </div>
         <div class="stat">
           <div class="k">Warranties in force</div>
-          <div class="v">${s.active_warranties} <small>items</small></div>
-        </div>
-        <div class="stat">
-          <div class="k">Invoices on record</div>
-          <div class="v">${s.all_count}</div>
+          <div class="v">${s.active_warranties} <small>of these items</small></div>
         </div>`;
     } catch (e) {
       $("stats").innerHTML = `<div class="stat"><div class="k">Stats</div><div class="v"><small>${I7.esc(e.message)}</small></div></div>`;
@@ -150,6 +171,9 @@
 
   /* ---------------- search ---------------- */
   async function search() {
+    /* The figures above describe the same period and branch as the list,
+       so they are refreshed together with it. Cashiers have no figures. */
+    if (document.body.dataset.role !== "cashier") loadStats();
     const p = new URLSearchParams({
       q: $("q").value.trim(),
       field: $("field").value,

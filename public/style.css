@@ -269,7 +269,7 @@ table.lines .idx{
    DASHBOARD
    ========================================================== */
 .dash{padding:24px 26px 70px;max-width:1240px;margin:0 auto;color:var(--on-dark)}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:10px;margin-bottom:24px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:24px}
 .stat{background:var(--ink-2);border:1px solid var(--ink-3);border-radius:2px;padding:14px 15px}
 .stat .k{
   font-size:9px;font-weight:700;letter-spacing:.17em;text-transform:uppercase;
@@ -278,7 +278,15 @@ table.lines .idx{
 .stat .v{font-family:var(--mono);font-size:21px;font-weight:700;color:var(--on-dark);line-height:1.15}
 .stat .v small{font-size:11px;color:var(--on-dark-soft);font-weight:400}
 .stat.hero{border-color:var(--lime-dim)}
-.stat.hero .v{color:var(--lime)}
+/* The takings run to millions, and "LKR 209,103,275.00" was breaking
+   after the currency. The headline tile takes two columns and shrinks
+   its own text to fit, so the figure stays on one line however big
+   the month has been. */
+.stat.hero{grid-column:span 2}
+.stat.hero .v{
+  color:var(--lime);white-space:nowrap;
+  font-size:clamp(17px, 2.1vw, 25px);
+}
 
 .searchbar{
   background:var(--ink-2);border:1px solid var(--ink-3);border-radius:2px;
